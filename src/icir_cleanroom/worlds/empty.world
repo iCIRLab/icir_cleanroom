@@ -1,0 +1,123 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="empty">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- 조명 설정 -->    
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- 땅바닥 설정 -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- 월드 플러그인 -->
+    <plugin name="gas_world_plugin" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/gazebo</namespace>
+      </ros>
+      <update_rate>1.0</update_rate>
+    </plugin>
+    
+    <!-- 외부 벽 -->
+    <model name="gas_obstacle_wall_left">
+      <static>true</static>
+      <pose>-6.55 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 13 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 13 1</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_right">
+      <static>true</static>
+      <pose>6.55 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 13 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 13 1</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_top">
+      <static>true</static>
+      <pose>0 5.05 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>13 0.1 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>13 0.1 1</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_bottom">
+      <static>true</static>
+      <pose>0 -5.05 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>13 0.1 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>13 0.1 1</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 가스 소스 모델 -->
+    <model name="gas_source">
+      <static>true</static>
+      <pose>0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>0.2</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>0.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.5 0 1</ambient>
+            <diffuse>1 0.5 0 1</diffuse>
+            <emissive>1 0.5 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
