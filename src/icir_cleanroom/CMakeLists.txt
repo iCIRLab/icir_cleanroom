@@ -51,6 +51,7 @@ ament_target_dependencies(gas_source_plugin
     rclcpp
     gazebo_ros
     std_msgs
+    geometry_msgs
 )
 
 target_link_libraries(gas_source_plugin ${GAZEBO_LIBRARIES})
@@ -72,6 +73,11 @@ install(TARGETS
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+    scripts/gas_ground_truth_debug_node.py
+    DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

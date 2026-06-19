@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include "std_msgs/msg/float64.hpp"
 #include <rclcpp/logging.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
 namespace gazebo
 {
@@ -25,6 +26,7 @@ namespace gazebo
             event::ConnectionPtr update_connection;
             std::shared_ptr<rclcpp::Node> ros_node;
             rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr concentration_pub;
+            rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
             rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr concentration_sub;
             rclcpp::TimerBase::SharedPtr timer;
 

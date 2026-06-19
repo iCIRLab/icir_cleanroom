@@ -39,6 +39,11 @@ namespace gazebo
         }
 
         concentration_pub = ros_node->create_publisher<std_msgs::msg::Float64>(topic_name, 10);
+        
+        // DEBUG ONLY: 실제 환경에서는 존재하지 않는 위치 정보 발행
+        pose_pub = ros_node->create_publisher<geometry_msgs::msg::PoseStamped>(
+            "/gas_source/pose", rclcpp::QoS(10)
+        );
 
         // 외부에서 설정된 농도를 구독하는 subscription
         std::string set_topic;
@@ -81,6 +86,17 @@ namespace gazebo
         auto concentration_msg = std_msgs::msg::Float64();
         concentration_msg.data = initial_concentration;
         concentration_pub->publish(concentration_msg);
+
+        // DEBUG ONLY: 디버그 시각화 노드에서만 사용, 실제 가스 센서 시스템에는 해당 토픽 없음
+        auto pose_msg = geometry_msgs::msg::PoseStamped();
+        pose_msg.header.stamp = ros_node->now();
+        pose_msg.header.frame_id = "map";
+        auto pos = model->WorldPose().Pos();
+        pose_msg.pose.position.x = pos.X();
+        pose_msg.pose.position.y = pos.Y();
+        pose_msg.pose.position.z = pos.Z();
+        pose_msg.pose.orientation.w = 1.0;
+        pose_pub->publish(pose_msg);
     }
 
     GZ_REGISTER_MODEL_PLUGIN(GasSourcePlugin)
