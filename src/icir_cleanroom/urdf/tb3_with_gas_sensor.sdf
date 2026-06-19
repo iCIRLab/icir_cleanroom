@@ -581,5 +581,10 @@
       <joint_name>wheel_left_joint</joint_name>
       <joint_name>wheel_right_joint</joint_name>
     </plugin>
+
+    <plugin name="gas_sensor_plugin" filename="libgas_sensor_plugin.so">
+      <sensor_link_name>gas_sensor_link</sensor_link_name>
+      <detector_radius>0.015</detector_radius>
+    </plugin>
   </model>
 </sdf>

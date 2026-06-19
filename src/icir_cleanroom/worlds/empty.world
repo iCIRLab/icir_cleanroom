@@ -118,6 +118,10 @@
           </material>
         </visual>
       </link>
+      <plugin name="gas_source_plugin" filename="libgas_source_plugin.so">
+        <initial_concentration>100.0</initial_concentration>
+        <radius>0.1</radius>
+      </plugin>
     </model>
   </world>
 </sdf>
