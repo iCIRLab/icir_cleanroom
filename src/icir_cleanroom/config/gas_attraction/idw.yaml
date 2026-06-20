@@ -1,0 +1,2 @@
+idw:
+  sigma: 0.5  # IDW 가중치 폭

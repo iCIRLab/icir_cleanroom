@@ -1,0 +1,12 @@
+<library path="gas_attraction_layer">
+    <class name="gas_layer::GasAttractionLocalLayer"
+           type="gas_layer::GasAttractionLocalLayer"
+           base_class_type="nav2_costmap_2d::Layer">
+        <description>Gas attraction local layer</description>
+    </class>
+    <class name="gas_layer::GasAttractionGlobalLayer"
+           type="gas_layer::GasAttractionGlobalLayer"
+           base_class_type="nav2_costmap_2d::Layer">
+        <description>Gas attraction global layer</description>
+    </class>
+</library>
