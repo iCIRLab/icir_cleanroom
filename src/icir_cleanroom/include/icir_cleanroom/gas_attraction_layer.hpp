@@ -62,8 +62,8 @@ namespace gas_layer
 
                         double avg_concentration = value_sum_grid_[vj][vi] / weight_sum;
                         double norm = std::clamp(avg_concentration / max_concentration_, 0.0, 1.0);
-                        uint8_t cost = static_cast<uint8_t>((1.0 - norm) * 252.0);
-
+                        uint8_t cost = static_cast<uint8_t>((1.0 - norm) * 50.0);
+                        cost = std::max<uint8_t>(cost, 1);  // FREE_SPACE(0)와 겹치지 않게 최소 1로 보정
                         master_grid.setCost(i, j, cost);
                     }
                 }

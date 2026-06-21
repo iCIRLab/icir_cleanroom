@@ -97,6 +97,7 @@ install(TARGETS
 
 install(PROGRAMS
     scripts/gas_ground_truth_debug_node.py
+    scripts/gas_patrol_node.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
