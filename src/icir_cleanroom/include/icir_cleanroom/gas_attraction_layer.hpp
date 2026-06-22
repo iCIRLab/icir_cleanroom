@@ -30,6 +30,7 @@ namespace gas_layer
             int grid_height_ = 202;
             double max_concentration_ = 100.0;
             double sigma_ = 0.5; // IDW 가중치 폭
+            static constexpr uint8_t kNoDataCost = 150;
 
             std::vector<std::vector<float>> value_sum_grid_;
             std::vector<std::vector<float>> weight_sum_grid_;
@@ -58,11 +59,13 @@ namespace gas_layer
                         if (vi < 0 || vi >= grid_width_ || vj < 0 || vj >= grid_height_) continue;
 
                         double weight_sum = weight_sum_grid_[vj][vi];
-                        if (weight_sum <= 1e-6) continue;
-
+                        if (weight_sum <= 1e-6) {
+                            master_grid.setCost(i, j, std::max(existing_cost, kNoDataCost));
+                            continue;
+                        }
                         double avg_concentration = value_sum_grid_[vj][vi] / weight_sum;
                         double norm = std::clamp(avg_concentration / max_concentration_, 0.0, 1.0);
-                        uint8_t cost = static_cast<uint8_t>((1.0 - norm) * 50.0);
+                        uint8_t cost = static_cast<uint8_t>((1.0 - norm) * 100.0);
                         cost = std::max<uint8_t>(cost, 1);  // FREE_SPACE(0)와 겹치지 않게 최소 1로 보정
                         master_grid.setCost(i, j, cost);
                     }

@@ -23,7 +23,7 @@ MAX_PURIFY_ATTEMPTS = 3
 # ]
 
 # (-5.0, -4.0) 시작 -> 단순 왕복 경로
-WAYPOINTS = [(-5.0, -2.0), (4.0, -2.0)]
+WAYPOINTS = [(-5.0, -1.0), (4.0, -1.0)]
 
 class GasPatrolNode(Node):
     def __init__(self):
