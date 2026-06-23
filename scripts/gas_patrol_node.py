@@ -17,13 +17,13 @@ MONITOR_PERIOD_SEC = 0.5
 MAX_PURIFY_ATTEMPTS = 3
 
 # (-5.0, -4.0) 시작 -> 점점 좁혀지는 사각 소용돌이
-# WAYPOINTS = [
-#     (5.0, -4.0), (5.0, 4.0), (-5.0, 4.0), (-5.0, -2.0),
-#     (3.0, -2.0), (3.0, 2.0), (-2.0, 1.0), (-2.0, 0.0), (0.0, 0.0)
-# ]
+WAYPOINTS = [
+    (5.0, -4.0), (5.0, 4.0), (-5.0, 4.0), (-5.0, -2.0),
+    (3.0, -2.0), (3.0, 2.0), (-2.0, 1.0), (-2.0, 0.0), (0.0, 0.0)
+]
 
 # (-5.0, -4.0) 시작 -> 단순 왕복 경로
-WAYPOINTS = [(-5.0, -1.0), (4.0, -1.0)]
+# WAYPOINTS = [(-5.0, -1.0), (4.0, -1.0)]
 
 class GasPatrolNode(Node):
     def __init__(self):
@@ -112,7 +112,14 @@ class GasPatrolNode(Node):
         self.latest_concentration = msg.data
         if (PURIFY_ENABLED and self.state == 'PATROLLING' and not self.suppress_detection
                 and self.latest_concentration > DETECT_THRESHOLD):
-            self.start_purifying()
+            self.start_seeking()
+
+    # ---------------- SEEKING ----------------
+    def start_seeking(self):
+        self.get_logger().info(
+            f'=== PURIFYING start === concentration={self.latest_concentration:.1f} '
+            f'(threshold={DETECT_THRESHOLD}, resume_threshold={RESUME_THRESHOLD}, timeout={WAIT_TIMEOUT_SEC}s)')
+        self.state = 'SEEKING'
 
     # ---------------- PURIFYING ----------------
 
