@@ -69,6 +69,14 @@ def generate_launch_description():
         output='screen'
     )
 
+    gas_concentration_marker = Node(
+        package='icir_cleanroom',
+        executable='gas_concentration_marker_node.py',
+        name='gas_concentration_marker_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         gazebo_server,
@@ -77,4 +85,5 @@ def generate_launch_description():
         spawn_robot,
         map_to_odom_tf,
         rviz,
+        gas_concentration_marker,
     ])
