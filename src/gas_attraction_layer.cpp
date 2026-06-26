@@ -30,6 +30,10 @@ namespace gas_layer
             "/gas_sensor/sensor_pose", rclcpp::QoS(1),
             std::bind(&GasAttractionLocalLayer::poseCallback, this, std::placeholders::_1));
 
+        reset_sub_ = node->create_subscription<std_msgs::msg::Empty>(
+            "/gas_attraction_local_layer/reset", rclcpp::QoS(1),
+            std::bind(&GasAttractionLocalLayer::resetCallback, this, std::placeholders::_1));
+
         value_pub_ = node->create_publisher<std_msgs::msg::Float32MultiArray>(
             "/gas_attraction_local_layer/value_grid", rclcpp::QoS(1));
         weight_pub_ = node->create_publisher<std_msgs::msg::Float32MultiArray>(
@@ -51,6 +55,15 @@ namespace gas_layer
         latest_pose_ = *msg;
         has_pose_ = true;
         tryAccumulate();
+    }
+
+    // 정화 완료 등으로 그동안 누적된 농도 기억을 전부 지우고 미탐색(150) 상태로 되돌림
+    void GasAttractionLocalLayer::resetCallback(const std_msgs::msg::Empty::SharedPtr /*msg*/)
+    {
+        initGrids();
+        publishGrids();
+        current_ = true;
+        RCLCPP_INFO(rclcpp::get_logger("GasAttractionLocalLayer"), "grid reset");
     }
 
     void GasAttractionLocalLayer::tryAccumulate()

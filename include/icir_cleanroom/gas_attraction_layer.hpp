@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
+#include <std_msgs/msg/empty.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <vector>
 #include <algorithm>
@@ -121,6 +122,7 @@ namespace gas_layer
 
             rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr concentration_sub_;
             rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
+            rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr reset_sub_;
 
             rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr value_pub_;
             rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr weight_pub_;
@@ -128,6 +130,7 @@ namespace gas_layer
 
             void concentrationCallback(const std_msgs::msg::Float64::SharedPtr msg);
             void poseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+            void resetCallback(const std_msgs::msg::Empty::SharedPtr msg);
             void tryAccumulate();
             void accumulateIntensityAt(double sensor_x, double sensor_y, double concentration);
             void publishGrids();

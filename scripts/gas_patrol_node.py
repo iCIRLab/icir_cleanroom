@@ -1,67 +1,88 @@
 #!/usr/bin/env python3
+import math
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 
-from nav2_msgs.action import NavigateToPose, Wait
-from std_msgs.msg import Float64
-from builtin_interfaces.msg import Duration
+from nav2_msgs.action import NavigateToPose
+from std_msgs.msg import Float64, Empty
+from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
 
-PURIFY_ENABLED = False  # 정화 모드 정지 타이밍 버그로 인해 임시 비활성화
+DETECT_THRESHOLD = 100.0
+SEEK_STEP = 0.4
+SEEK_DIRECTIONS = [(1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (0.0, -1.0)]  # E, N, W, S
+IMPROVEMENT_MARGIN = 3.0  # 이 이상 커져야 "개선"으로 인정
+SEEK_STEP_TIMEOUT_SEC = 3.0  # nav2가 이 시간 안에 끝내지 못하면 그 방향은 실패로 간주
 
-DETECT_THRESHOLD = 50.0
-RESUME_THRESHOLD = 20.0
-WAIT_TIMEOUT_SEC = 10
-MONITOR_PERIOD_SEC = 0.5
-MAX_PURIFY_ATTEMPTS = 3
+PURIFY_PERIOD_SEC = 0.1
+PURIFY_RATE = 10.0  # PURIFY_PERIOD_SEC마다 줄어드는 양
 
 # (-5.0, -4.0) 시작 -> 점점 좁혀지는 사각 소용돌이
-WAYPOINTS = [
-    (5.0, -4.0), (5.0, 4.0), (-5.0, 4.0), (-5.0, -2.0),
-    (3.0, -2.0), (3.0, 2.0), (-2.0, 1.0), (-2.0, 0.0), (0.0, 0.0)
-]
+# WAYPOINTS = [
+#     (5.0, -4.0), (5.0, 4.0), (-5.0, 4.0), (-5.0, -2.0),
+#     (3.0, -2.0), (3.0, 2.0), (-2.0, 1.0), (-2.0, 0.0), (0.0, 0.0)
+# ]
 
 # (-5.0, -4.0) 시작 -> 단순 왕복 경로
 # WAYPOINTS = [(-5.0, -1.0), (4.0, -1.0)]
+WAYPOINTS = [(-1.4, 2.4), (4.0, 2.2)]
 
 class GasPatrolNode(Node):
     def __init__(self):
         super().__init__('gas_patrol_node')
 
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
-        self.wait_client = ActionClient(self, Wait, 'wait')
 
         self.create_subscription(
             Float64, '/gas_sensor/detected_concentration',
             self.concentration_callback, 10)
+        self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10)
+        self.create_subscription(
+            Float64, '/gas_source/concentration', self.source_concentration_callback, 10)
+        self.source_set_pub = self.create_publisher(Float64, '/gas_source/concentration_set', 10)
+        self.attraction_reset_pub = self.create_publisher(Empty, '/gas_attraction_local_layer/reset', 10)
 
         self.state = 'PATROLLING'
         self.current_index = 0
         self.direction = 1  # +1: 바깥->중심, -1: 중심->바깥
         self.latest_concentration = 0.0
+        self.current_x = 0.0
+        self.current_y = 0.0
 
         self.nav_goal_handle = None
-        self.wait_goal_handle = None
-        self.monitor_timer = None
-        self.purify_fail_count = 0
-        self.suppress_detection = False
+        self.seek_dir_index = 0
+        self.prev_seek_concentration = 0.0
+        self.no_improvement_count = 0
+        self.seek_step_id = 0
+        self.seek_timeout_timer = None
+
+        self.source_concentration = None
+        self.purify_timer = None
 
         self.get_logger().info(f'patrol route ({len(WAYPOINTS)} points): {WAYPOINTS}')
         self.send_next_waypoint()
 
-    # ---------------- PATROLLING ----------------
+    def odom_callback(self, msg: Odometry):
+        # map->odom이 identity static transform이라 odom 좌표를 map 좌표로 그대로 씀
+        self.current_x = msg.pose.pose.position.x
+        self.current_y = msg.pose.pose.position.y
 
-    def send_next_waypoint(self):
-        x, y = WAYPOINTS[self.current_index]
-        self.get_logger().info(f'heading to waypoint[{self.current_index}] = ({x:.2f}, {y:.2f})')
+    def source_concentration_callback(self, msg: Float64):
+        self.source_concentration = msg.data
+
+    def send_nav_goal(self, x, y):
+        yaw = math.atan2(y - self.current_y, x - self.current_x)
 
         goal = NavigateToPose.Goal()
         goal.pose.header.frame_id = 'map'
         goal.pose.header.stamp = self.get_clock().now().to_msg()
         goal.pose.pose.position.x = x
         goal.pose.pose.position.y = y
-        goal.pose.pose.orientation.w = 1.0
+        goal.pose.pose.orientation.z = math.sin(yaw / 2.0)
+        goal.pose.pose.orientation.w = math.cos(yaw / 2.0)
 
         self.nav_client.wait_for_server()
         future = self.nav_client.send_goal_async(goal)
@@ -72,28 +93,36 @@ class GasPatrolNode(Node):
         if not goal_handle.accepted:
             self.get_logger().warn('NavigateToPose goal rejected')
             return
-        
+
         self.nav_goal_handle = goal_handle
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(
             lambda f: self.nav_result_callback(f, goal_handle))
 
     def nav_result_callback(self, future, goal_handle):
-        if self.state != 'PATROLLING' or goal_handle is not self.nav_goal_handle:
-            return  # PURIFYING으로 취소됐거나, 이미 선점된 stale goal의 결과는 무시
-        
+        if goal_handle is not self.nav_goal_handle:
+            return  # 이미 선점된 stale goal의 결과는 무시
+
         status = future.result().status
+        if status == GoalStatus.STATUS_CANCELED:
+            return  # 의도적으로 취소한 경우 - 후속 동작은 취소를 호출한 쪽에서 직접 진행시킴
+
+        if self.state == 'SEEKING':
+            self.seek_step_result(status)
+        else:
+            self.patrol_step_result(status)
+
+    # ---------------- PATROLLING ----------------
+
+    def send_next_waypoint(self):
+        x, y = WAYPOINTS[self.current_index]
+        self.get_logger().info(f'heading to waypoint[{self.current_index}] = ({x:.2f}, {y:.2f})')
+        self.send_nav_goal(x, y)
+
+    def patrol_step_result(self, status):
         if status != GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().warn(f'NavigateToPose failed with status={status}, retrying same waypoint')
             self.send_next_waypoint()  # advance 없이 같은 목표 재시도
-            return
-
-        was_suppressed = self.suppress_detection
-        self.suppress_detection = False  # 도착 완료 - 다시 감지 활성화
-
-        if PURIFY_ENABLED and self.latest_concentration > DETECT_THRESHOLD and not was_suppressed:
-            # 도착 시점에 이미 임계값을 넘었고, 감지 무시 모드가 아니면 바로 정화
-            self.start_purifying()
             return
 
         self.advance_waypoint()
@@ -110,86 +139,141 @@ class GasPatrolNode(Node):
 
     def concentration_callback(self, msg: Float64):
         self.latest_concentration = msg.data
-        if (PURIFY_ENABLED and self.state == 'PATROLLING' and not self.suppress_detection
-                and self.latest_concentration > DETECT_THRESHOLD):
-            self.start_seeking()
+        self.get_logger().info(
+            f'concentration={self.latest_concentration:.1f}', throttle_duration_sec=1.0)
 
-    # ---------------- SEEKING ----------------
+        if self.state == 'PATROLLING' and self.latest_concentration > DETECT_THRESHOLD:
+            self.start_seeking()
+        elif self.state in ('SEEKING', 'FOUND') and self.latest_concentration <= DETECT_THRESHOLD:
+            self.resume_patrolling()
+
+    # ---------------- SEEKING (gradient ascent) ----------------
+
+    # PATROLLING -> SEEKING 전환: 현재 진행 중인 patrol 골을 취소하고 탐색 시작
     def start_seeking(self):
         self.get_logger().info(
-            f'=== PURIFYING start === concentration={self.latest_concentration:.1f} '
-            f'(threshold={DETECT_THRESHOLD}, resume_threshold={RESUME_THRESHOLD}, timeout={WAIT_TIMEOUT_SEC}s)')
+            f'=== SEEKING start === concentration={self.latest_concentration:.1f} '
+            f'(threshold={DETECT_THRESHOLD})')
         self.state = 'SEEKING'
+        self.seek_dir_index = 0
+        self.no_improvement_count = 0
+
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
+
+        self.begin_seek_step()
+
+    # 현재 방향(seek_dir_index)으로 한 스텝(SEEK_STEP) 이동하는 골을 보내고 타임아웃 타이머 설정
+    def begin_seek_step(self):
+        self.cancel_seek_timeout()
+
+        self.prev_seek_concentration = self.latest_concentration
+        dx, dy = SEEK_DIRECTIONS[self.seek_dir_index]
+        target_x = self.current_x + dx * SEEK_STEP
+        target_y = self.current_y + dy * SEEK_STEP
+        self.get_logger().info(
+            f'seek step dir={self.seek_dir_index} -> ({target_x:.2f}, {target_y:.2f})')
+        self.send_nav_goal(target_x, target_y)
+
+        self.seek_step_id += 1
+        step_id = self.seek_step_id
+        self.seek_timeout_timer = self.create_timer(
+            SEEK_STEP_TIMEOUT_SEC, lambda: self.on_seek_step_timeout(step_id))
+
+    # 진행 중인 seek 타임아웃 타이머가 있으면 취소
+    def cancel_seek_timeout(self):
+        if self.seek_timeout_timer is not None:
+            self.seek_timeout_timer.cancel()
+            self.seek_timeout_timer = None
+
+    # 한 스텝이 SEEK_STEP_TIMEOUT_SEC 안에 끝나지 않으면 nav2 골을 취소하고 실패 처리
+    def on_seek_step_timeout(self, step_id):
+        self.cancel_seek_timeout()
+        if self.state != 'SEEKING' or step_id != self.seek_step_id:
+            return  # 이미 다음 스텝으로 넘어갔거나 SEEKING을 벗어난 stale 타임아웃
+
+        self.get_logger().warn(
+            f'seek step dir={self.seek_dir_index} timeout ({SEEK_STEP_TIMEOUT_SEC}s) - 실패로 간주')
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
+
+        self.seek_step_failed()
+
+    # 스텝 이동 결과(nav2 골 status)를 보고 농도가 충분히 올랐으면 같은 방향 계속, 아니면 실패 처리
+    def seek_step_result(self, status):
+        self.cancel_seek_timeout()
+
+        improved = status == GoalStatus.STATUS_SUCCEEDED and \
+            self.latest_concentration - self.prev_seek_concentration > IMPROVEMENT_MARGIN
+
+        if improved:
+            self.no_improvement_count = 0
+            self.begin_seek_step()
+        else:
+            self.seek_step_failed()
+
+    # 현재 방향 실패 처리 후 다음 방향으로 전환, 모든 방향이 다 실패하면 FOUND로 전환
+    def seek_step_failed(self):
+        self.no_improvement_count += 1
+        self.seek_dir_index = (self.seek_dir_index + 1) % len(SEEK_DIRECTIONS)
+
+        if self.no_improvement_count >= len(SEEK_DIRECTIONS):
+            self.enter_found()
+        else:
+            self.begin_seek_step()
+
+    # SEEKING 종료, 소스 위치를 찾았다고 판단하고 PURIFYING 단계로 진입
+    def enter_found(self):
+        self.get_logger().info(
+            f'=== FOUND === concentration={self.latest_concentration:.1f} '
+            f'- {len(SEEK_DIRECTIONS)}방향 모두 개선 없음, 탐색 종료하고 정지')
+        self.state = 'FOUND'
+        self.start_purifying()
 
     # ---------------- PURIFYING ----------------
 
+    # PURIFYING 시작: 일정 주기(PURIFY_PERIOD_SEC)로 purify_step을 반복 호출하는 타이머 설정
     def start_purifying(self):
-        self.get_logger().info(
-            f'=== PURIFYING start === concentration={self.latest_concentration:.1f} '
-            f'(threshold={DETECT_THRESHOLD}, resume_threshold={RESUME_THRESHOLD}, timeout={WAIT_TIMEOUT_SEC}s)')
+        self.get_logger().info('=== PURIFYING start === 가스 소스 강도를 서서히 낮춤')
         self.state = 'PURIFYING'
+        self.purify_timer = self.create_timer(PURIFY_PERIOD_SEC, self.purify_step)
 
-        if self.nav_goal_handle is not None:
-            cancel_future = self.nav_goal_handle.cancel_goal_async()
-            cancel_future.add_done_callback(lambda f: self._begin_wait())
-        else:
-            self._begin_wait()
-
-    def _begin_wait(self):
-        wait_goal = Wait.Goal()
-        wait_goal.time = Duration(sec=WAIT_TIMEOUT_SEC)
-
-        self.wait_client.wait_for_server()
-        future = self.wait_client.send_goal_async(wait_goal)
-        future.add_done_callback(self.wait_goal_response_callback)
-
-        self.monitor_timer = self.create_timer(MONITOR_PERIOD_SEC, self.monitor_during_purify)
-
-    def wait_goal_response_callback(self, future):
-        self.wait_goal_handle = future.result()
-        if not self.wait_goal_handle.accepted:
-            self.get_logger().warn('Wait goal rejected')
-            self.finish_purifying()
+    # 거리 기반 근접도(proximity)에 비례해 가스 소스 농도를 줄여서 발행, 0이 되면 정화 완료 처리
+    def purify_step(self):
+        if self.source_concentration is None or self.source_concentration <= 0.0:
+            self.get_logger().warn('source concentration 아직 수신 안됨 - purify step 대기')
             return
-        result_future = self.wait_goal_handle.get_result_async()
-        result_future.add_done_callback(self.wait_result_callback)
 
-    def monitor_during_purify(self):
+        # 거리를 직접 알 수는 없지만, 센서값/소스 출력값 비율이 곧 거리 감쇠율(gas_sensor_plugin의
+        # (1/distance^2)과 같으므로 이를 "가까운 정도"로 써서 정화 속도에 반영
+        proximity = min(1.0, self.latest_concentration / self.source_concentration)
+        decrement = PURIFY_RATE * proximity
+
+        new_value = max(0.0, self.source_concentration - decrement)
+        self.source_set_pub.publish(Float64(data=new_value))
         self.get_logger().info(
-            f'purifying... checking concentration={self.latest_concentration:.1f} '
-            f'(resume below {RESUME_THRESHOLD})')
-        if self.latest_concentration < RESUME_THRESHOLD and self.wait_goal_handle is not None:
-            self.get_logger().info('concentration dropped below resume threshold - canceling wait early')
-            self.wait_goal_handle.cancel_goal_async()
+            f'purifying... proximity={proximity:.2f} source concentration '
+            f'{self.source_concentration:.1f} -> {new_value:.1f}')
 
-    def wait_result_callback(self, future):
-        self.finish_purifying()
+        if new_value <= 0.0:
+            self.get_logger().info('=== PURIFYING complete === 가스 소스 제거 완료')
+            self.attraction_reset_pub.publish(Empty())  # 누적된 농도 기억을 지우고 미탐색 상태로 되돌림
+            self.resume_patrolling()
 
-    def finish_purifying(self):
-        if self.monitor_timer is not None:
-            self.monitor_timer.cancel()
-            self.monitor_timer = None
+    # PURIFYING/FOUND 종료, 정화 타이머와 진행 중인 골 정리 후 PATROLLING으로 복귀
+    def resume_patrolling(self):
+        self.get_logger().info(
+            f'=== {self.state} end === concentration={self.latest_concentration:.1f} - resume patrol')
         self.state = 'PATROLLING'
 
-        if self.latest_concentration < RESUME_THRESHOLD:
-            # 정화 성공 - 같은 waypoint로 계속 진행
-            self.get_logger().info(
-                f'=== PURIFYING end (success) === concentration={self.latest_concentration:.1f} - resume patrol')
-            self.purify_fail_count = 0
-            self.send_next_waypoint()
-        else:
-            # 타임아웃까지 갔는데도 농도가 안 떨어짐 - 실패로 간주
-            self.purify_fail_count += 1
-            self.get_logger().warn(
-                f'=== PURIFYING end (timeout) === concentration={self.latest_concentration:.1f} '
-                f'- attempt {self.purify_fail_count}/{MAX_PURIFY_ATTEMPTS}')
+        if self.purify_timer is not None:
+            self.purify_timer.cancel()
+            self.purify_timer = None
 
-            if self.purify_fail_count >= MAX_PURIFY_ATTEMPTS:
-                self.get_logger().warn('max purify attempts reached - push through to waypoint ignoring gas')
-                self.purify_fail_count = 0
-                self.suppress_detection = True  # 도착할 때까지 감지 무시
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
 
-            self.send_next_waypoint()  # advance 없이 같은 waypoint로 (suppress 상태면 끝까지 밀고감)
+        self.send_next_waypoint()  # advance 없이 같은 waypoint로 재출발
 
 
 def main(args=None):

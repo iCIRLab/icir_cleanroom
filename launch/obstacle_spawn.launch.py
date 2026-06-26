@@ -4,6 +4,7 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('icir_cleanroom')
@@ -13,6 +14,21 @@ def generate_launch_description():
     urdf_file = os.path.join(pkg_dir, 'urdf', 'tb3_with_gas_sensor.urdf')
     sdf_file = os.path.join(pkg_dir, 'urdf', 'tb3_with_gas_sensor.sdf')
     rviz_config_file = os.path.join(pkg_dir, 'rviz', 'default.rviz')
+
+    nav2_params_path = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')
+    map_yaml_path = os.path.join(pkg_dir, 'map', 'obstacle_room.yaml')
+    map_data_yaml_path = os.path.join(pkg_dir, 'config', 'gas_attraction', 'map_data.yaml')
+    idw_yaml_path = os.path.join(pkg_dir, 'config', 'gas_attraction', 'idw.yaml')
+
+    configured_params = RewrittenYaml(
+        source_file=nav2_params_path,
+        root_key='',
+        param_rewrites={
+            'map_data_yaml': map_data_yaml_path,
+            'idw_yaml': idw_yaml_path,
+        },
+        convert_types=True
+    )
 
     os.environ['TURTLEBOT3_MODEL'] = 'waffle_pi'
 
@@ -77,6 +93,29 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    nav2_bringup_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory('nav2_bringup'),
+                'launch',
+                'bringup_launch.py'
+            )
+        ),
+        launch_arguments={
+            'use_sim_time': 'true',
+            'map': map_yaml_path,
+            'params_file': configured_params
+        }.items()
+    )
+
+    gas_patrol_node = Node(
+        package='icir_cleanroom',
+        executable='gas_patrol_node.py',
+        name='gas_patrol_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         gazebo_server,
@@ -86,4 +125,6 @@ def generate_launch_description():
         map_to_odom_tf,
         rviz,
         gas_concentration_marker,
+        TimerAction(period=5.0, actions=[nav2_bringup_launch]),
+        TimerAction(period=8.0, actions=[gas_patrol_node]),
     ])
