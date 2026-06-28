@@ -71,18 +71,31 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /map
       Value: true
-    - Alpha: 0.5
+    - Alpha: 0.7
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
-      Draw Behind: true
+      Draw Behind: false
       Enabled: true
-      Name: GasConcentrationDebug
+      Name: GasSourceMap
       Topic:
         Depth: 5
-        Durability Policy: Transient Local
+        Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /debug/gas_concentration_map
+        Value: /gas_source_map
+      Value: true
+    - Alpha: 0.6
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: true
+      Name: GasConcentrationMap
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /gas_concentration_map
       Value: true
     - Alpha: 0.7
       Class: rviz_default_plugins/Map

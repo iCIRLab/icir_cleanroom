@@ -94,6 +94,14 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    gas_source_map = Node(
+        package='icir_cleanroom',
+        executable='gas_source_map_node.py',
+        name='gas_source_map_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
     nav2_bringup_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -126,7 +134,7 @@ def generate_launch_description():
         map_to_odom_tf,
         rviz,
         gas_concentration_marker,
+        gas_source_map,
         TimerAction(period=5.0, actions=[nav2_bringup_launch]),
         TimerAction(period=8.0, actions=[gas_patrol_node]),
     ])
-~ㅇ

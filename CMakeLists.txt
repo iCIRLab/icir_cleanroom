@@ -99,6 +99,7 @@ install(PROGRAMS
     scripts/gas_ground_truth_debug_node.py
     scripts/gas_patrol_node.py
     scripts/gas_concentration_marker_node.py
+    scripts/gas_source_map_node.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
