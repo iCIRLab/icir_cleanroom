@@ -1,0 +1,238 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="cleanroom">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>5</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <plugin name="gas_world_plugin" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/gazebo</namespace>
+      </ros>
+      <update_rate>1.0</update_rate>
+    </plugin>
+
+    <!-- ===== 외벽 ===== -->
+    <model name="cleanroom_wall_left">
+      <static>true</static>
+      <pose>-6.55 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 10.1 1</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 10.1 1</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cleanroom_wall_right">
+      <static>true</static>
+      <pose>6.55 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 10.1 1</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 10.1 1</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cleanroom_wall_top">
+      <static>true</static>
+      <pose>0 5.05 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>13.1 0.1 1</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>13.1 0.1 1</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cleanroom_wall_bottom">
+      <static>true</static>
+      <pose>0 -5.05 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>13.1 0.1 1</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>13.1 0.1 1</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      ===== 레이아웃 =====
+
+      외벽 장비 (2.5m x 2.0m x 1.2m, x 중심 ±5.25):
+        x ∈ [-6.5, -4.0] / [4.0, 6.5]
+        y 중심: -3.0, 0.0, 3.0 → 유닛 간 1.0m 통로
+
+      내벽 장비 (1.5m x 2.0m x 1.2m, x 중심 ±2.25):
+        x ∈ [-3.0, -1.5] / [1.5, 3.0]
+        y 중심: -3.0, 3.0 (y=0 비워서 좌우 관통 십자 통로 확보)
+
+      사이드 통로 (x ∈ [-4.0, -3.0] / [3.0, 4.0]): 1.0m
+      중앙 복도  (x ∈ [-1.5,  1.5]):               3.0m
+      십자 통로  (y=0 구간, x ∈ [-3.0, 3.0]):       내벽 장비 없음
+    -->
+
+    <!-- ===== 좌측 외벽 장비 (3대) ===== -->
+    <model name="equip_left_outer_1">
+      <static>true</static>
+      <pose>-5.25 -3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_left_outer_2">
+      <static>true</static>
+      <pose>-5.25 0.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_left_outer_3">
+      <static>true</static>
+      <pose>-5.25 3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== 좌측 내벽 장비 (2대, y=0 비워서 십자 통로 확보) ===== -->
+    <model name="equip_left_inner_1">
+      <static>true</static>
+      <pose>-2.25 -3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.3 0.5 0.45 1</ambient><diffuse>0.3 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_left_inner_2">
+      <static>true</static>
+      <pose>-2.25 3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.3 0.5 0.45 1</ambient><diffuse>0.3 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== 우측 외벽 장비 (3대, 좌측 대칭) ===== -->
+    <model name="equip_right_outer_1">
+      <static>true</static>
+      <pose>5.25 -3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_right_outer_2">
+      <static>true</static>
+      <pose>5.25 0.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_right_outer_3">
+      <static>true</static>
+      <pose>5.25 3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>2.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.25 0.35 0.55 1</ambient><diffuse>0.25 0.35 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== 우측 내벽 장비 (2대, 좌측 대칭) ===== -->
+    <model name="equip_right_inner_1">
+      <static>true</static>
+      <pose>2.25 -3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.3 0.5 0.45 1</ambient><diffuse>0.3 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="equip_right_inner_2">
+      <static>true</static>
+      <pose>2.25 3.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.5 2.0 1.2</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 2.0 1.2</size></box></geometry>
+          <material><ambient>0.3 0.5 0.45 1</ambient><diffuse>0.3 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== 가스 소스 ===== -->
+    <model name="gas_source">
+      <static>true</static>
+      <pose>0.0 -3.0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.1</radius><length>0.2</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.1</radius><length>0.2</length></cylinder></geometry>
+          <material>
+            <ambient>1 0.5 0 1</ambient>
+            <diffuse>1 0.5 0 1</diffuse>
+            <emissive>1 0.5 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <plugin name="gas_source_plugin" filename="libgas_source_plugin.so">
+        <initial_concentration>500.0</initial_concentration>
+        <radius>0.1</radius>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>
