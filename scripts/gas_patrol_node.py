@@ -12,7 +12,7 @@ from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
 from gazebo_msgs.srv import SetEntityState
 
-DETECT_THRESHOLD = 100.0
+DETECT_THRESHOLD = 250.0
 INITIAL_SOURCE_CONCENTRATION = 500.0
 # 가스 소스 재배치 가능 범위 (외벽 ±6.55/±5.05에서 1m 마진)
 GAS_SPAWN_X_MIN, GAS_SPAWN_X_MAX = -5.5, 5.5
@@ -23,6 +23,7 @@ IMPROVEMENT_MARGIN = 5.0  # 이 이상 커져야 "개선"으로 인정
 SEEK_STEP_TIMEOUT_SEC = 3.0  # nav2가 이 시간 안에 끝내지 못하면 그 방향은 실패로 간주
 
 PURIFY_PERIOD_SEC = 0.1
+GAS_RESPAWN_DELAY_SEC = 10.0
 PURIFY_RATE = 10.0  # PURIFY_PERIOD_SEC마다 줄어드는 양
 
 # (-5.0, -4.0) 시작 -> 점점 좁혀지는 사각 소용돌이
@@ -84,6 +85,14 @@ class GasPatrolNode(Node):
 
         self.get_logger().info(f'patrol route ({len(WAYPOINTS)} points): {WAYPOINTS}')
         self.send_next_waypoint()
+
+        # 시작 시 가스 소스 랜덤 배치 (Gazebo 서비스 준비 대기 1초)
+        self._initial_respawn_timer = self.create_timer(1.0, self._initial_respawn_once)
+
+    def _initial_respawn_once(self):
+        self._initial_respawn_timer.cancel()
+        self._initial_respawn_timer = None
+        self.respawn_gas_source()
 
     def odom_callback(self, msg: Odometry):
         # map->odom이 identity static transform이라 odom 좌표를 map 좌표로 그대로 씀
@@ -279,7 +288,7 @@ class GasPatrolNode(Node):
             self.get_logger().info('=== PURIFYING complete === 가스 소스 제거 완료, 5초 후 랜덤 위치로 재생성')
             self.attraction_reset_pub.publish(Empty())
             self.resume_patrolling()
-            self.respawn_timer = self.create_timer(5.0, self._respawn_once)
+            self.respawn_timer = self.create_timer(GAS_RESPAWN_DELAY_SEC, self._respawn_once)
 
     # 5초 지연 원샷 콜백 - 한 번 실행 후 타이머 자체를 취소
     def _respawn_once(self):
@@ -288,11 +297,12 @@ class GasPatrolNode(Node):
             self.respawn_timer = None
         self.respawn_gas_source()
 
-    # 가스 소스를 맵 내 랜덤 위치로 이동하고 초기 농도로 재설정
+    # 가스 소스를 맵 내 랜덤 위치로 이동하고 초기 농도로 재설정, 가장 가까운 waypoint로 우선 이동
     def respawn_gas_source(self):
         x = random.uniform(GAS_SPAWN_X_MIN, GAS_SPAWN_X_MAX)
         y = random.uniform(GAS_SPAWN_Y_MIN, GAS_SPAWN_Y_MAX)
         self.get_logger().info(f'=== GAS SOURCE RESPAWN === 새 위치: ({x:.2f}, {y:.2f})')
+        self._redirect_patrol_to_nearest(x, y)
 
         req = SetEntityState.Request()
         req.state.name = 'gas_source'
@@ -312,6 +322,22 @@ class GasPatrolNode(Node):
         # 가스 소스 농도를 초기값으로 재설정
         self.source_set_pub.publish(Float64(data=INITIAL_SOURCE_CONCENTRATION))
         self.source_concentration = INITIAL_SOURCE_CONCENTRATION
+
+    # 가스 발생 위치(x, y)에서 가장 가까운 waypoint로 patrol 경로 재설정
+    def _redirect_patrol_to_nearest(self, x, y):
+        nearest_idx = min(
+            range(len(WAYPOINTS)),
+            key=lambda i: (WAYPOINTS[i][0] - x) ** 2 + (WAYPOINTS[i][1] - y) ** 2
+        )
+        self.current_index = nearest_idx
+        self.get_logger().info(
+            f'=== GAS ALERT === waypoint[{nearest_idx}] {WAYPOINTS[nearest_idx]} 으로 우선 이동')
+
+        if self.state == 'PATROLLING':
+            if self.nav_goal_handle is not None:
+                self.nav_goal_handle.cancel_goal_async()
+                self.nav_goal_handle = None  # stale cancel 결과 무시
+            self.send_next_waypoint()
 
     # PURIFYING/FOUND 종료, 정화 타이머와 진행 중인 골 정리 후 PATROLLING으로 복귀
     def resume_patrolling(self):
