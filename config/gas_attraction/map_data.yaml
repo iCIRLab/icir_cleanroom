@@ -4,4 +4,4 @@ map_data:
   map_origin_x: -6.53
   map_origin_y: -5.05
   map_resolution: 0.05
-  max_intensity: 100.0
+  max_intensity: 500.0

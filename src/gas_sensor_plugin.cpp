@@ -93,11 +93,11 @@ void GasSensorPlugin::FindAndSubscribeToSources()
 
 double GasSensorPlugin::CalculateDetectedConcentration(double distance, double source_concentration)
 {
-    double distance_attenuation = 1.0 / (distance * distance);
-    if (distance_attenuation > 1.0) distance_attenuation = 1.0;
-
-    double detected = source_concentration * distance_attenuation;
-    return std::max(0.0, detected);
+    // 가우시안 확산 모델: 바람 없는 정적 환경에서의 가스 농도 분포
+    // σ=1.5m 기준, 소스에서 멀어질수록 자연스럽게 감소
+    constexpr double sigma = 1.5;
+    double attenuation = std::exp(-(distance * distance) / (2.0 * sigma * sigma));
+    return std::max(0.0, source_concentration * attenuation);
 }
 
 void GasSensorPlugin::OnUpdate()
