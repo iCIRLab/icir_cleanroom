@@ -11,6 +11,7 @@ from std_msgs.msg import Float64, Empty
 from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
 from gazebo_msgs.srv import SetEntityState
+from visualization_msgs.msg import Marker
 
 DETECT_THRESHOLD = 250.0
 INITIAL_SOURCE_CONCENTRATION = 500.0
@@ -64,6 +65,7 @@ class GasPatrolNode(Node):
         self.source_set_pub = self.create_publisher(Float64, '/gas_source/concentration_set', 10)
         self.attraction_reset_pub = self.create_publisher(Empty, '/gas_attraction_local_layer/reset', 10)
         self.set_entity_state_client = self.create_client(SetEntityState, '/gazebo/set_entity_state')
+        self.state_marker_pub = self.create_publisher(Marker, '/robot_state_marker', 10)
 
         self.state = 'PATROLLING'
         self.current_index = 0
@@ -94,10 +96,39 @@ class GasPatrolNode(Node):
         self._initial_respawn_timer = None
         self.respawn_gas_source()
 
+    STATE_COLORS = {
+        'PATROLLING': (0.2, 0.8, 0.2),   # 초록
+        'SEEKING':    (1.0, 0.6, 0.0),   # 주황
+        'FOUND':      (1.0, 0.2, 0.2),   # 빨강
+        'PURIFYING':  (0.2, 0.6, 1.0),   # 파랑
+    }
+
+    def _publish_state_marker(self):
+        m = Marker()
+        m.header.frame_id = 'map'
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.ns = 'robot_state'
+        m.id = 0
+        m.type = Marker.TEXT_VIEW_FACING
+        m.action = Marker.ADD
+        m.pose.position.x = self.current_x
+        m.pose.position.y = self.current_y
+        m.pose.position.z = 0.8
+        m.pose.orientation.w = 1.0
+        m.scale.z = 0.3
+        r, g, b = self.STATE_COLORS.get(self.state, (1.0, 1.0, 1.0))
+        m.color.r = r
+        m.color.g = g
+        m.color.b = b
+        m.color.a = 1.0
+        m.text = self.state
+        self.state_marker_pub.publish(m)
+
     def odom_callback(self, msg: Odometry):
         # map->odom이 identity static transform이라 odom 좌표를 map 좌표로 그대로 씀
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
+        self._publish_state_marker()
 
     def source_concentration_callback(self, msg: Float64):
         self.source_concentration = msg.data
