@@ -16,6 +16,7 @@
     <depend>nav_msgs</depend>
     <depend>visualization_msgs</depend>
     <depend>gazebo_ros</depend>
+    <depend>gazebo_msgs</depend>
     <depend>tf2_ros</depend>
     <depend>nav2_costmap_2d</depend>
     <depend>pluginlib</depend>

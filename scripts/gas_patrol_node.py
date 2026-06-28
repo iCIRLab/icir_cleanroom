@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import random
 
 import rclpy
 from rclpy.node import Node
@@ -9,11 +10,16 @@ from nav2_msgs.action import NavigateToPose
 from std_msgs.msg import Float64, Empty
 from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
+from gazebo_msgs.srv import SetEntityState
 
 DETECT_THRESHOLD = 100.0
+INITIAL_SOURCE_CONCENTRATION = 500.0
+# 가스 소스 재배치 가능 범위 (외벽 ±6.55/±5.05에서 1m 마진)
+GAS_SPAWN_X_MIN, GAS_SPAWN_X_MAX = -5.5, 5.5
+GAS_SPAWN_Y_MIN, GAS_SPAWN_Y_MAX = -4.0, 4.0
 SEEK_STEP = 0.4
 SEEK_DIRECTIONS = [(1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (0.0, -1.0)]  # E, N, W, S
-IMPROVEMENT_MARGIN = 3.0  # 이 이상 커져야 "개선"으로 인정
+IMPROVEMENT_MARGIN = 5.0  # 이 이상 커져야 "개선"으로 인정
 SEEK_STEP_TIMEOUT_SEC = 3.0  # nav2가 이 시간 안에 끝내지 못하면 그 방향은 실패로 간주
 
 PURIFY_PERIOD_SEC = 0.1
@@ -27,7 +33,8 @@ PURIFY_RATE = 10.0  # PURIFY_PERIOD_SEC마다 줄어드는 양
 
 # (-5.0, -4.0) 시작 -> 단순 왕복 경로
 # WAYPOINTS = [(-5.0, -1.0), (4.0, -1.0)]
-WAYPOINTS = [(-1.4, 2.4), (4.0, 2.2)]
+# WAYPOINTS = [(-1.4, 2.4), (4.0, 2.2)]
+WAYPOINTS = [(5.0, -1.0), (-3.3, -1.0), (-3.3, 2.0), (4.0,2.0)]
 
 class GasPatrolNode(Node):
     def __init__(self):
@@ -44,6 +51,7 @@ class GasPatrolNode(Node):
             Float64, '/gas_source/concentration', self.source_concentration_callback, 10)
         self.source_set_pub = self.create_publisher(Float64, '/gas_source/concentration_set', 10)
         self.attraction_reset_pub = self.create_publisher(Empty, '/gas_attraction_local_layer/reset', 10)
+        self.set_entity_state_client = self.create_client(SetEntityState, '/gazebo/set_entity_state')
 
         self.state = 'PATROLLING'
         self.current_index = 0
@@ -61,6 +69,7 @@ class GasPatrolNode(Node):
 
         self.source_concentration = None
         self.purify_timer = None
+        self.respawn_timer = None
 
         self.get_logger().info(f'patrol route ({len(WAYPOINTS)} points): {WAYPOINTS}')
         self.send_next_waypoint()
@@ -256,9 +265,42 @@ class GasPatrolNode(Node):
             f'{self.source_concentration:.1f} -> {new_value:.1f}')
 
         if new_value <= 0.0:
-            self.get_logger().info('=== PURIFYING complete === 가스 소스 제거 완료')
-            self.attraction_reset_pub.publish(Empty())  # 누적된 농도 기억을 지우고 미탐색 상태로 되돌림
+            self.get_logger().info('=== PURIFYING complete === 가스 소스 제거 완료, 5초 후 랜덤 위치로 재생성')
+            self.attraction_reset_pub.publish(Empty())
             self.resume_patrolling()
+            self.respawn_timer = self.create_timer(5.0, self._respawn_once)
+
+    # 5초 지연 원샷 콜백 - 한 번 실행 후 타이머 자체를 취소
+    def _respawn_once(self):
+        if self.respawn_timer is not None:
+            self.respawn_timer.cancel()
+            self.respawn_timer = None
+        self.respawn_gas_source()
+
+    # 가스 소스를 맵 내 랜덤 위치로 이동하고 초기 농도로 재설정
+    def respawn_gas_source(self):
+        x = random.uniform(GAS_SPAWN_X_MIN, GAS_SPAWN_X_MAX)
+        y = random.uniform(GAS_SPAWN_Y_MIN, GAS_SPAWN_Y_MAX)
+        self.get_logger().info(f'=== GAS SOURCE RESPAWN === 새 위치: ({x:.2f}, {y:.2f})')
+
+        req = SetEntityState.Request()
+        req.state.name = 'gas_source'
+        req.state.pose.position.x = x
+        req.state.pose.position.y = y
+        req.state.pose.position.z = 0.5
+        req.state.pose.orientation.w = 1.0
+        req.state.reference_frame = 'world'
+
+        if self.set_entity_state_client.service_is_ready():
+            future = self.set_entity_state_client.call_async(req)
+            future.add_done_callback(
+                lambda f: self.get_logger().info('가스 소스 위치 이동 완료'))
+        else:
+            self.get_logger().warn('/gazebo/set_entity_state 서비스 미준비 - 위치 이동 건너뜀')
+
+        # 가스 소스 농도를 초기값으로 재설정
+        self.source_set_pub.publish(Float64(data=INITIAL_SOURCE_CONCENTRATION))
+        self.source_concentration = INITIAL_SOURCE_CONCENTRATION
 
     # PURIFYING/FOUND 종료, 정화 타이머와 진행 중인 골 정리 후 PATROLLING으로 복귀
     def resume_patrolling(self):
