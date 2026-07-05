@@ -32,7 +32,7 @@ namespace gazebo
 
             double initial_concentration;   // 초기 가스 농도
             double radius;                  // 가스 발생원 반경
-            
+
     };
 }
 

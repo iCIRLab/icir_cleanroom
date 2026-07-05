@@ -103,6 +103,10 @@ install(PROGRAMS
     DESTINATION lib/${PROJECT_NAME}
 )
 
+install(FILES scripts/kernel_dm_grid.py
+    DESTINATION lib/${PROJECT_NAME}
+)
+
 install(FILES plugin_description.xml
     DESTINATION share/${PROJECT_NAME}
 )

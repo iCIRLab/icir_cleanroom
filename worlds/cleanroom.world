@@ -229,7 +229,9 @@
         </visual>
       </link>
       <plugin name="gas_source_plugin" filename="libgas_source_plugin.so">
-        <initial_concentration>500.0</initial_concentration>
+        <!-- 시작 시 0. 로봇 스폰 위치와 가까워 허위 감지되는 것을 막고,
+             패트롤 시작 1초 뒤 respawn_gas_source가 랜덤 위치+농도500으로 설정 -->
+        <initial_concentration>0.0</initial_concentration>
         <radius>0.1</radius>
       </plugin>
     </model>
