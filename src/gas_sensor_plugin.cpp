@@ -23,6 +23,12 @@ void GasSensorPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     else
         this->detector_radius = 0.1;
 
+    // config/gas_model.yaml의 sigma 값과 반드시 일치시켜야 함
+    if (_sdf->HasElement("sigma"))
+        this->sigma = _sdf->Get<double>("sigma");
+    else
+        this->sigma = 1.5;
+
     std::string sensor_link_name = "gas_sensor_link";
     if (_sdf->HasElement("sensor_link_name"))
         sensor_link_name = _sdf->Get<std::string>("sensor_link_name");
@@ -94,9 +100,8 @@ void GasSensorPlugin::FindAndSubscribeToSources()
 double GasSensorPlugin::CalculateDetectedConcentration(double distance, double source_concentration)
 {
     // 가우시안 확산 모델: 바람 없는 정적 환경에서의 가스 농도 분포
-    // σ=1.5m 기준, 소스에서 멀어질수록 자연스럽게 감소
-    constexpr double sigma = 1.5;
-    double attenuation = std::exp(-(distance * distance) / (2.0 * sigma * sigma));
+    // 소스에서 멀어질수록 자연스럽게 감소, sigma는 SDF 파라미터(<sigma>)로 주입됨
+    double attenuation = std::exp(-(distance * distance) / (2.0 * this->sigma * this->sigma));
     return std::max(0.0, source_concentration * attenuation);
 }
 
