@@ -3,7 +3,9 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from nav2_common.launch import RewrittenYaml
 
 def generate_launch_description():
@@ -32,6 +34,8 @@ def generate_launch_description():
     )
 
     os.environ['TURTLEBOT3_MODEL'] = 'waffle_pi'
+
+    use_grid_refine = LaunchConfiguration('use_grid_refine')
 
     gazebo_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -122,11 +126,17 @@ def generate_launch_description():
         executable='gas_patrol_node.py',
         name='gas_patrol_node',
         output='screen',
-        parameters=[{'use_sim_time': True}]
+        parameters=[{
+            'use_sim_time': True,
+            'use_grid_refine': ParameterValue(use_grid_refine, value_type=bool),
+        }]
     )
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument(
+            'use_grid_refine', default_value='true',
+            description='true=Kernel DM+SPIRAL 통합, false=SPIRAL만(baseline)'),
         gazebo_server,
         gazebo_client,
         robot_state_publisher,

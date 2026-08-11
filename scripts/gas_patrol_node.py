@@ -71,6 +71,12 @@ SPIRAL_STEP_TIMEOUT_SEC = 5.0  # nav2가 이 시간 안에 끝내지 못하면 �
 # 나선을 이 팔 길이 이상으로 넓혀도 더 나은 지점(HIT)을 못 찾으면 지역 최댓값 = 소스 도착으로 간주.
 SPIRAL_MAX_ARM = 1.5        # 나선 팔 길이 상한 (m)
 
+# REFINING: SPIRAL이 상한에 도달해 지역 최댓값으로 판단한 뒤, 로봇이 서 있는 그 자리 대신
+# Kernel DM 그리드의 argmax로 한 번 더 이동해서 FOUND 위치를 보정. 데이터 분석 결과 SPIRAL의
+# 정지점은 그리드 추정치보다 부정확한 경우가 많았음(개방공간에서도 89%가 그리드가 더 정확).
+REFINE_MIN_DISTANCE = 0.05     # argmax가 이미 이 거리 안이면 보정 이동 생략
+REFINE_STEP_TIMEOUT_SEC = 5.0  # nav2가 이 시간 안에 끝내지 못하면 현재 위치에서 FOUND 확정
+
 # PATROLLING 워치독: nav2가 이 시간 안에 waypoint에 도달 못하면 (끼임/응답없음)
 # 해당 waypoint를 포기하고 다음으로 건너뜀
 PATROL_STEP_TIMEOUT_SEC = 60.0
@@ -107,6 +113,16 @@ WAYPOINTS = [
 class GasPatrolNode(Node):
     def __init__(self):
         super().__init__('gas_patrol_node')
+
+        # 실행 버전 토글 (Ablation 실험용)
+        #   use_grid_refine=False : SPIRAL만 사용 (나선 수렴 위치를 그대로 FOUND) - baseline
+        #   use_grid_refine=True  : Kernel DM + SPIRAL 통합 (나선 수렴 후 그리드 argmax로 보정 이동)
+        # 그리드(히트맵)는 두 버전 모두 계속 만들어 heatmap_est를 로그에 남긴다(추정오차 비교용).
+        # 차이는 "로봇이 실제로 argmax로 이동하는지" 뿐이다.
+        self.declare_parameter('use_grid_refine', True)
+        self.use_grid_refine = self.get_parameter('use_grid_refine').value
+        self.run_mode = 'SPIRAL+KernelDM' if self.use_grid_refine else 'SPIRAL-only'
+        self.get_logger().info(f'=== RUN MODE: {self.run_mode} (use_grid_refine={self.use_grid_refine}) ===')
 
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
 
@@ -156,6 +172,9 @@ class GasPatrolNode(Node):
         self.consecutive_miss = 0
         self.spiral_step_id = 0
         self.spiral_timeout_timer = None
+
+        self.refine_step_id = 0
+        self.refine_timeout_timer = None
 
         self.patrol_step_id = 0
         self.patrol_timeout_timer = None
@@ -283,6 +302,8 @@ class GasPatrolNode(Node):
 
         if self.state == 'SEEKING':
             self.seek_step_result(status)
+        elif self.state == 'REFINING':
+            self.refine_step_result(status)
         else:
             self.patrol_step_result(status)
 
@@ -468,7 +489,10 @@ class GasPatrolNode(Node):
 
         # 나선을 상한까지 넓혔는데도 더 나은 지점(HIT)이 없으면 지역 최댓값 도달 = 소스 도착
         if self.spiral_arm_length > SPIRAL_MAX_ARM:
-            self.enter_found()
+            if self.use_grid_refine:
+                self.start_refine_to_argmax()   # 통합: 그리드 argmax로 보정 이동
+            else:
+                self.enter_found()              # SPIRAL만: 나선 수렴 위치를 그대로 확정
             return
 
         if self.consecutive_miss >= MISS_LIMIT:
@@ -478,15 +502,64 @@ class GasPatrolNode(Node):
 
         self.begin_spiral_step()
 
+    # SPIRAL이 지역 최댓값에 도달한 뒤, 로봇이 서 있는 자리 대신 Kernel DM 그리드의
+    # argmax로 한 번 더 이동해서 FOUND 위치를 보정 (SPIRAL 정지점보다 그리드 추정이 더 정확함)
+    def start_refine_to_argmax(self):
+        est = self.grid.get_argmax_position()
+        if est is None or math.hypot(est[0] - self.current_x, est[1] - self.current_y) < REFINE_MIN_DISTANCE:
+            self.enter_found()
+            return
+
+        self.get_logger().info(
+            f'나선 상한 도달 - grid argmax로 최종 보정 이동: '
+            f'({self.current_x:.2f}, {self.current_y:.2f}) -> ({est[0]:.2f}, {est[1]:.2f})')
+        self.state = 'REFINING'
+        self.cancel_spiral_timeout()
+        self.send_nav_goal(est[0], est[1])
+
+        self.refine_step_id += 1
+        step_id = self.refine_step_id
+        self.refine_timeout_timer = self.create_timer(
+            REFINE_STEP_TIMEOUT_SEC, lambda: self.on_refine_timeout(step_id))
+
+    def cancel_refine_timeout(self):
+        if self.refine_timeout_timer is not None:
+            self.refine_timeout_timer.cancel()
+            self.refine_timeout_timer = None
+
+    # 보정 이동이 REFINE_STEP_TIMEOUT_SEC 안에 끝나지 않으면 (장비 근처라 planner가 못 감)
+    # nav2 골을 취소하고 도달 가능했던 위치에서 그대로 FOUND 확정
+    def on_refine_timeout(self, step_id):
+        self.cancel_refine_timeout()
+        if self.state != 'REFINING' or step_id != self.refine_step_id:
+            return  # 이미 다음 스텝으로 넘어갔거나 REFINING을 벗어난 stale 타임아웃
+
+        self.get_logger().warn('grid argmax 보정 이동 timeout - 현재 위치에서 FOUND 확정')
+        if self.nav_goal_handle is not None:
+            self.nav_goal_handle.cancel_goal_async()
+        self.enter_found()
+
+    # 보정 이동 결과와 무관하게(성공/실패 모두) 도달한 위치를 최종 FOUND 위치로 확정
+    def refine_step_result(self, status):
+        self.cancel_refine_timeout()
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().info('grid argmax 보정 이동 완료')
+        else:
+            self.get_logger().warn(
+                f'grid argmax 보정 이동 실패(status={status}) - 도달 가능했던 위치에서 FOUND 확정')
+        self.enter_found()
+
     # SEEKING 종료, 소스 위치에 도착했다고 판단하고 PURIFYING 단계로 진입
     def enter_found(self):
         est = self.grid.get_argmax_position()
         est_str = f'({est[0]:.2f}, {est[1]:.2f})' if est is not None else 'N/A'
         self.get_logger().info(
-            f'=== FOUND === robot_pos=({self.current_x:.2f}, {self.current_y:.2f}) '
+            f'=== FOUND === mode={self.run_mode} '
+            f'robot_pos=({self.current_x:.2f}, {self.current_y:.2f}) '
             f'concentration={self.latest_concentration:.1f} heatmap_est={est_str} '
-            f'- 나선 상한({SPIRAL_MAX_ARM}m)까지 개선 없음, 지역 최댓값 도달로 판단')
+            f'- 나선 상한({SPIRAL_MAX_ARM}m) 도달, 소스 도착으로 판단')
         self.cancel_spiral_timeout()
+        self.cancel_refine_timeout()
         if self.nav_goal_handle is not None:
             self.nav_goal_handle.cancel_goal_async()
         self.state = 'FOUND'
@@ -535,6 +608,7 @@ class GasPatrolNode(Node):
     def respawn_gas_source(self):
         # 새 에피소드 시작: 진행 중이던 탐색/정화를 정리하고 PATROLLING으로 리셋
         self.cancel_spiral_timeout()
+        self.cancel_refine_timeout()
         self.cancel_patrol_timeout()
         self.patrol_retry_count = 0
         if self.purify_timer is not None:
