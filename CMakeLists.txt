@@ -97,13 +97,17 @@ install(TARGETS
 
 install(PROGRAMS
     scripts/gas_ground_truth_debug_node.py
+    scripts/gas_grid_map_node.py
+    scripts/gas_grid_sampler_node.py
     scripts/gas_patrol_node.py
     scripts/gas_concentration_marker_node.py
     scripts/gas_source_map_node.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES scripts/kernel_dm_grid.py
+install(FILES
+    scripts/grid_graph_planner.py
+    scripts/kernel_dm_grid.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
