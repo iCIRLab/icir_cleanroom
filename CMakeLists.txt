@@ -96,6 +96,9 @@ install(TARGETS
 )
 
 install(PROGRAMS
+    scripts/gas_empty_map_node.py
+    scripts/gas_mapping_controller_node.py
+    scripts/lrs_path_planner_node.py
     scripts/gas_ground_truth_debug_node.py
     scripts/gas_grid_map_node.py
     scripts/gas_grid_sampler_node.py
@@ -106,6 +109,8 @@ install(PROGRAMS
 )
 
 install(FILES
+    scripts/gmrf_grid.py
+    scripts/lrs_tsp_planner.py
     scripts/grid_graph_planner.py
     scripts/kernel_dm_grid.py
     DESTINATION lib/${PROJECT_NAME}

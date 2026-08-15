@@ -1,0 +1,2 @@
+# Python-MIP bundles the CBC runtime through cbcbox on supported platforms.
+mip>=1.17,<2

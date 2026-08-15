@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="empty_lrs_50m">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>10</real_time_factor>
+      <real_time_update_rate>10000</real_time_update_rate>
+    </physics>
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+    <plugin name="gas_world_plugin" filename="libgazebo_ros_state.so">
+      <ros><namespace>/gazebo</namespace></ros>
+      <update_rate>1.0</update_rate>
+    </plugin>
+
+    <model name="gas_obstacle_wall_left">
+      <static>true</static><pose>-2.5 25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 55 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.1 55 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_right">
+      <static>true</static><pose>52.5 25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 55 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.1 55 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_top">
+      <static>true</static><pose>25 52.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>55 0.1 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>55 0.1 1</size></box></geometry></visual>
+      </link>
+    </model>
+    <model name="gas_obstacle_wall_bottom">
+      <static>true</static><pose>25 -2.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>55 0.1 1</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>55 0.1 1</size></box></geometry></visual>
+      </link>
+    </model>
+
+    <model name="gas_source">
+      <static>true</static><pose>10 10 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.1</radius><length>0.2</length></cylinder></geometry></collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.1</radius><length>0.2</length></cylinder></geometry>
+          <material><ambient>1 0.5 0 1</ambient><diffuse>1 0.5 0 1</diffuse><emissive>1 0.5 0 1</emissive></material>
+        </visual>
+      </link>
+      <plugin name="gas_source_plugin" filename="libgas_source_plugin.so">
+        <initial_concentration>100.0</initial_concentration>
+        <radius>0.1</radius>
+      </plugin>
+    </model>
+  </world>
+</sdf>
