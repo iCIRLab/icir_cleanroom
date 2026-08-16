@@ -109,7 +109,10 @@ install(PROGRAMS
 )
 
 install(FILES
+    scripts/gas_history.py
     scripts/gmrf_grid.py
+    scripts/hrs_path_planner.py
+    scripts/lrs_priority_planner.py
     scripts/lrs_tsp_planner.py
     scripts/grid_graph_planner.py
     scripts/kernel_dm_grid.py

@@ -27,28 +27,49 @@ Visualization Manager:
       Draw Behind: false
       Enabled: false
       Name: GaussianGroundTruth
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/ground_truth}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/ground_truth}
     - Alpha: 0.48
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Draw Behind: false
       Enabled: true
       Name: GaussianGroundTruthLog
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/ground_truth_log}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/ground_truth_log}
     - Alpha: 0.62
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Draw Behind: false
       Enabled: false
       Name: GMRFEstimateLinear
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/estimate}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/estimate}
     - Alpha: 0.62
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Draw Behind: false
       Enabled: true
       Name: GMRFEstimateLog
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/estimate_log}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/estimate_log}
+    - Alpha: 0.62
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: GMRFVariance
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/variance}
+    - Alpha: 0.62
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: HRSPotentialUCB
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/reward}
+    - Alpha: 0.55
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: LRSHistoryReward
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/reward}
     - Class: rviz_default_plugins/Path
       Enabled: true
       Name: LRSTSPRoute
@@ -56,19 +77,84 @@ Visualization Manager:
       Line Width: 0.04
       Color: 255; 220; 0
       Pose Style: None
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/tsp_route}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/route}
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: LRSActiveHistoryRoute
+      Line Style: Lines
+      Line Width: 0.07
+      Color: 255; 80; 255
+      Pose Style: None
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/active_route}
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: LRSPriorityRoute
+      Line Style: Lines
+      Line Width: 0.10
+      Color: 0; 255; 170
+      Pose Style: None
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/priority_route}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: LRSPriorityCandidates
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/priority_candidates}
+    - Alpha: 0.58
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: GasConcentrationHistory
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/concentration}
+    - Alpha: 0.58
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: GasConcentrationHistoryLog
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/concentration_log}
+    - Alpha: 0.58
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: true
+      Name: GasConcentrationHistoryRecentLog
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/recent_log}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: HistoryRevisitLocations
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/revisit}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: HistoryConfirmedPeaks
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/confirmed_peaks}
     - Class: rviz_default_plugins/Marker
       Enabled: false
       Name: SamplingStatus
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/sampling_status}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/status}
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: SamplingStatusLog
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/sampling_status_log}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/status_log}
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: HRSRoute
+      Line Style: Lines
+      Line Width: 0.06
+      Color: 0; 255; 180
+      Pose Style: None
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/route}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: HRSCandidates
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/candidates}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: HRSAccumulatedStatus
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/status}
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: GasSource
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_lrs/source}
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/source}
     - Class: rviz_default_plugins/RobotModel
       Description Source: Topic
       Description Topic: {Depth: 5, Durability Policy: Volatile, Reliability Policy: Reliable, Value: /robot_description}

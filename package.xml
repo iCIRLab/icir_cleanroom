@@ -11,6 +11,7 @@
 
     <depend>rclcpp</depend>
     <depend>rclpy</depend>
+    <depend>rcl_interfaces</depend>
     <depend>std_msgs</depend>
     <depend>geometry_msgs</depend>
     <depend>nav_msgs</depend>
@@ -23,9 +24,11 @@
     <depend>nav2_common</depend>
     <depend>nav2_msgs</depend>
     <depend>action_msgs</depend>
+    <depend>std_srvs</depend>
 
     <exec_depend>python3-numpy</exec_depend>
     <exec_depend>python3-scipy</exec_depend>
+    <exec_depend>python3-yaml</exec_depend>
 
     <export>
         <build_type>ament_cmake</build_type>

@@ -23,11 +23,15 @@ class LrsPathPlannerNode(Node):
     def __init__(self):
         super().__init__('lrs_path_planner_node')
         defaults = {
-            'lrs_spacing': 10.0,
-            'lrs_min_x': 0.0, 'lrs_max_x': 50.0,
-            'lrs_min_y': 0.0, 'lrs_max_y': 50.0,
-            'robot_start_x': 0.0, 'robot_start_y': 0.0,
-            'goal_clearance': 0.25, 'tsp_time_limit': 60.0,
+            'lrs_spacing': 10.0,    # LRS(격자) 샘플링 지점들 사이의 간격(m)
+            'lrs_min_x': 0.0,       # 격자 생성 범위 x축 최소(m)
+            'lrs_max_x': 50.0,      # 격자 생성 범위 x축 최대(m)
+            'lrs_min_y': 0.0,       # 격자 생성 범위 y축 최소(m)
+            'lrs_max_y': 50.0,      # 격자 생성 범위 y축 최대(m)
+            'robot_start_x': 0.0,   # TSP 경로 계산 시 로봇 출발 x 위치
+            'robot_start_y': 0.0,   # TSP 경로 계산 시 로봇 출발 y 위치
+            'goal_clearance': 0.25, # 후보 지점이 장애물과 유지해야할 최소 거리(m)
+            'tsp_time_limit': 60.0, # TSP 최적 경로 계산 제한 시간(초)
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -36,11 +40,11 @@ class LrsPathPlannerNode(Node):
             raise ValueError('LRS spacing must be positive and clearance non-negative')
 
         self.path_pub = self.create_publisher(
-            Path, '/gas_lrs/tsp_route', transient_qos())
+            Path, '/gas_mapping/lrs/route', transient_qos())
         self.points_pub = self.create_publisher(
-            Marker, '/gas_lrs/sampling_status', transient_qos())
+            Marker, '/gas_mapping/lrs/status', transient_qos())
         self.points_log_pub = self.create_publisher(
-            Marker, '/gas_lrs/sampling_status_log', transient_qos())
+            Marker, '/gas_mapping/lrs/status_log', transient_qos())
         self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, transient_qos())
         self.planned = False
@@ -117,7 +121,7 @@ class LrsPathPlannerNode(Node):
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = 'gas_lrs_sampling_points'
+        marker.ns = 'gas_mapping_lrs_status'
         marker.id = 0
         marker.type = Marker.POINTS
         marker.action = Marker.ADD
@@ -127,7 +131,7 @@ class LrsPathPlannerNode(Node):
         marker.points = [Point(x=p.x, y=p.y, z=0.08) for p in ordered]
         self.points_pub.publish(marker)
         log_marker = copy.deepcopy(marker)
-        log_marker.ns = 'gas_lrs_sampling_points_log'
+        log_marker.ns = 'gas_mapping_lrs_status_log'
         self.points_log_pub.publish(log_marker)
 
 
