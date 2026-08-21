@@ -1,8 +1,0 @@
-image: empty_lrs_50m.pgm
-mode: trinary
-resolution: 1.0
-# The occupied boundary is outside the paper's 0..50 m sampling domain.
-origin: [-2.5, -2.5, 0.0]
-negate: 0
-occupied_thresh: 0.65
-free_thresh: 0.25

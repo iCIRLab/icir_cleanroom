@@ -23,7 +23,6 @@ void GasSensorPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     else
         this->detector_radius = 0.1;
 
-    // config/gas_model.yaml의 sigma 값과 반드시 일치시켜야 함
     if (_sdf->HasElement("sigma"))
         this->sigma = _sdf->Get<double>("sigma");
     else

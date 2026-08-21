@@ -1,4 +1,0 @@
-# 무풍 가우시안 확산 모델의 sigma. urdf/tb3_with_gas_sensor.sdf의
-# gas_sensor_plugin <sigma> 값과 반드시 일치시켜야 함.
-gas_model:
-  sigma: 1.5
