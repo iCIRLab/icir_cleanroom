@@ -82,6 +82,46 @@ icir_cleanroom/
 Controller의 공개 토픽 23개, 파라미터 46개, 서비스와 Nav2 action 이름은
 리팩터링 전과 동일합니다.
 
+## 실제 실행 흐름
+
+```mermaid
+sequenceDiagram
+    participant Launch as cleanroom_empty.launch.py
+    participant Map as EmptyMapNode
+    participant LRS as LRSPlannerNode
+    participant Ctrl as ControllerNode
+    participant App as Orchestrator
+    participant GMRF
+    participant Nav2
+    participant RViz
+
+    Launch->>Map: 지도·가스원 node 시작
+    Launch->>LRS: LRS planner 시작
+    Launch->>Ctrl: Mapping controller 시작
+
+    Map->>LRS: /map 발행
+    Map->>Ctrl: GMRF domain 발행
+    LRS->>Ctrl: 기본 LRS route 발행
+
+    Ctrl->>App: 시작 조건 충족 전달
+    App->>App: LRS 회차 초기화
+    App->>Nav2: LRS 이동 목표 전송
+    Nav2-->>App: 이동 결과 반환
+
+    Map->>Ctrl: 측정 농도 발행
+    Ctrl->>App: 측정 결과 전달
+    App->>GMRF: observation 추가 및 지도 갱신
+    GMRF-->>App: 추정 농도·분산·UCB 반환
+    Ctrl->>RViz: 지도·경로·Marker 발행
+
+    App->>App: 위험 감지 시 HRS 전환
+    App->>Nav2: HRS 후보 셀 이동
+    Nav2-->>App: 이동 결과 반환
+    App->>App: 최고 농도 셀 확인
+```
+
+실선은 요청·명령·데이터 전달을, 점선은 처리 결과·응답 반환을 나타냅니다.
+
 ## 테스트
 
 ```bash
