@@ -5,7 +5,10 @@ from itertools import combinations
 import math
 import time
 
-from hrs_path_planner import solve_held_karp_free_end_path
+import numpy as np
+from scipy.optimize import linear_sum_assignment
+
+from .exact_path import solve_held_karp_free_end_path
 
 
 @dataclass(frozen=True)
@@ -236,7 +239,67 @@ def lrs_coverage_fallback(active_cycle, start_xy, baseline=None,
         planning_seconds=time.monotonic() - planning_started)
 
 
+
+
+def distance(first, second):
+    return math.hypot(first[0] - second[0], first[1] - second[1])
+
+def history_adjusted_cycle(base_points, history_points, replace_radius,
+                           start_xy):
+    """Replace nearby base points, insert distant points, and rotate a cycle.
+
+    Returns ``(ordered_points, replacements, additions)``. Points are ``(x,y)``
+    tuples. A large assignment penalty first maximizes valid one-to-one
+    replacements and then minimizes their total distance.
+    """
+    route = [tuple(point) for point in base_points]
+    history = [tuple(point) for point in history_points]
+    replacements = []
+    additions = []
+    if not route:
+        return history, replacements, history
+
+    replaced_history = set()
+    if history:
+        distances = np.asarray([
+            [distance(hotspot, base) for base in route]
+            for hotspot in history
+        ], dtype=float)
+        penalty = 1.0e6
+        assignment_cost = distances + (distances > replace_radius) * penalty
+        history_indices, base_indices = linear_sum_assignment(assignment_cost)
+        for history_index, base_index in zip(history_indices, base_indices):
+            separation = float(distances[history_index, base_index])
+            if separation <= replace_radius:
+                original = route[base_index]
+                route[base_index] = history[history_index]
+                replaced_history.add(int(history_index))
+                replacements.append(
+                    (original, history[history_index], separation))
+
+    for history_index, hotspot in enumerate(history):
+        if history_index in replaced_history:
+            continue
+        best = None
+        for index, first in enumerate(route):
+            second = route[(index + 1) % len(route)]
+            increase = (
+                distance(first, hotspot) + distance(hotspot, second) -
+                distance(first, second))
+            key = (increase, index)
+            if best is None or key < best[0]:
+                best = (key, index + 1)
+        route.insert(best[1], hotspot)
+        additions.append(hotspot)
+
+    start_index = min(
+        range(len(route)),
+        key=lambda index: (distance(route[index], start_xy), index))
+    route = route[start_index:] + route[:start_index]
+    return route, replacements, additions
+
+
 __all__ = [
-    'LrsPriorityRoute', 'LrsRewardPoint', 'lrs_coverage_fallback',
-    'solve_lrs_priority_route',
+    'LrsPriorityRoute', 'LrsRewardPoint', 'history_adjusted_cycle',
+    'lrs_coverage_fallback', 'solve_lrs_priority_route',
 ]

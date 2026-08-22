@@ -1,0 +1,61 @@
+# Public ROS contract preserved by the gas-mapping refactor.
+executables:
+  - gas_empty_map_node.py
+  - lrs_path_planner_node.py
+  - gas_mapping_controller_node.py
+launch: cleanroom_empty.launch.py
+topics:
+  sensor:
+    publishers:
+      /gas_sensor/sensor_pose: geometry_msgs/msg/PoseStamped
+      /gas_sensor/detected_concentration: std_msgs/msg/Float64
+  environment:
+    publishers:
+      /map: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/ground_truth: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/ground_truth_log: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/gmrf_domain: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/source: visualization_msgs/msg/Marker
+      /gas_mapping/sensor_concentration: std_msgs/msg/Float64
+  lrs_planner:
+    publishers:
+      /gas_mapping/lrs/route: nav_msgs/msg/Path
+      /gas_mapping/lrs/status: visualization_msgs/msg/Marker
+      /gas_mapping/lrs/status_log: visualization_msgs/msg/Marker
+  controller:
+    publishers:
+      - /gas_mapping/estimate
+      - /gas_mapping/estimate_log
+      - /gas_mapping/variance
+      - /gas_mapping/reward
+      - /gas_mapping/measurements/poses
+      - /gas_mapping/measurements/values
+      - /gas_mapping/lrs/status
+      - /gas_mapping/lrs/status_log
+      - /gas_mapping/lrs/active_route
+      - /gas_mapping/lrs/reward
+      - /gas_mapping/lrs/priority_candidates
+      - /gas_mapping/lrs/priority_route
+      - /gas_mapping/history/concentration
+      - /gas_mapping/history/concentration_log
+      - /gas_mapping/history/recent_log
+      - /gas_mapping/history/confirmed_peaks
+      - /gas_mapping/history/revisit
+      - /gas_mapping/lrs/lap
+      - /gas_mapping/hazard_state
+      - /gas_mapping/hrs/route
+      - /gas_mapping/hrs/candidates
+      - /gas_mapping/hrs/status
+      - /gas_mapping/phase
+services:
+  /gas_mapping/source/advance: std_srvs/srv/Trigger
+  /gas_mapping/history/clear: std_srvs/srv/Trigger
+actions:
+  navigate_to_pose: nav2_msgs/action/NavigateToPose
+qos:
+  retained_outputs: {reliability: reliable, durability: transient_local, depth: 1}
+  sensor_pose_plugin: {depth: 10}
+  sensor_pose_environment: {depth: 20}
+  sensor_pose_controller: {depth: 30}
+  sensor_concentration_environment: {depth: 20}
+  sensor_concentration_controller: {depth: 30}

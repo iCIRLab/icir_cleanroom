@@ -10,6 +10,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -22,6 +23,8 @@ include_directories(
     ${GAZEBO_INCLUDE_DIRS}
 )
 link_directories(${GAZEBO_LIBRARY_DIRS})
+
+ament_python_install_package(icir_cleanroom)
 
 install(DIRECTORY
     launch
@@ -64,13 +67,15 @@ install(PROGRAMS
     DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES
-    scripts/gas_history.py
-    scripts/gmrf_grid.py
-    scripts/hrs_path_planner.py
-    scripts/lrs_priority_planner.py
-    scripts/lrs_tsp_planner.py
-    DESTINATION lib/${PROJECT_NAME}
-)
+if(BUILD_TESTING)
+    set(ENV{PYTEST_DISABLE_PLUGIN_AUTOLOAD} "1")
+    find_package(ament_cmake_pytest REQUIRED)
+    ament_add_pytest_test(gas_mapping_characterization test
+        APPEND_ENV
+            PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+        TIMEOUT 120
+    )
+endif()
 
 ament_package()

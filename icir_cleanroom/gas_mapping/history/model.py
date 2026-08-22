@@ -1,21 +1,16 @@
-"""Persistent gas history and history-aware LRS route helpers."""
+"""Gas-history state, calculations, and compatibility API."""
 
 from __future__ import annotations
 
-import json
 import math
-import os
-import tempfile
 
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 
 
-class GasHistoryStore:
+class GasHistory:
     VERSION = 3
 
-    def __init__(self, path, map_msg, hazard_threshold, recent_alpha=0.5):
-        self.path = os.path.expanduser(str(path))
+    def __init__(self, map_msg, hazard_threshold, recent_alpha=0.5):
         self.width = int(map_msg.info.width)
         self.height = int(map_msg.info.height)
         self.resolution = float(map_msg.info.resolution)
@@ -269,7 +264,10 @@ class GasHistoryStore:
                    for item in events]
         for first in range(len(events)):
             for second in range(first + 1, len(events)):
-                if distance(centers[first], centers[second]) <= merge_radius:
+                separation = math.hypot(
+                    centers[first][0] - centers[second][0],
+                    centers[first][1] - centers[second][1])
+                if separation <= merge_radius:
                     union(first, second)
 
         groups = {}
@@ -510,170 +508,8 @@ class GasHistoryStore:
             int(record['row']), int(record['col'])))
         return candidates[:int(top_k)]
 
-    def _metadata(self):
-        return {
-            'width': self.width, 'height': self.height,
-            'resolution': self.resolution,
-            'origin_x': self.origin_x, 'origin_y': self.origin_y,
-        }
 
-    def save(self):
-        directory = os.path.dirname(self.path) or '.'
-        os.makedirs(directory, exist_ok=True)
-        payload = {
-            'version': self.VERSION,
-            'map': self._metadata(),
-            'records': [
-                self.records[key] for key in sorted(self.records)],
-            'history_count': self.history_count,
-            'history_mean': self.history_mean.ravel().tolist(),
-            'history_recent': self.history_recent.ravel().tolist(),
-            'recent_alpha': self.recent_alpha,
-            'confirmed_event_sequence': self.confirmed_event_sequence,
-            'confirmed_peak_events': sorted(
-                self.confirmed_peak_events.values(),
-                key=lambda item: (
-                    int(item['sequence']), str(item['event_id']))),
-        }
-        temporary_path = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                    mode='w', dir=directory, prefix='.gas_history_',
-                    suffix='.json', delete=False, encoding='utf-8') as stream:
-                json.dump(payload, stream, ensure_ascii=False, indent=2)
-                temporary_path = stream.name
-            os.replace(temporary_path, self.path)
-        finally:
-            if temporary_path is not None and os.path.exists(temporary_path):
-                os.unlink(temporary_path)
 
-    def load(self):
-        if not os.path.exists(self.path):
-            return False
-        with open(self.path, 'r', encoding='utf-8') as stream:
-            payload = json.load(stream)
-        version = int(payload.get('version', -1))
-        if version not in (1, 2, self.VERSION):
-            raise ValueError('unsupported gas history version')
-        metadata = payload.get('map', {})
-        expected = self._metadata()
-        for name in ('width', 'height'):
-            if int(metadata.get(name, -1)) != int(expected[name]):
-                raise ValueError(f'incompatible history map {name}')
-        for name in ('resolution', 'origin_x', 'origin_y'):
-            if not math.isclose(
-                    float(metadata.get(name, math.nan)), expected[name],
-                    rel_tol=0.0, abs_tol=1.0e-9):
-                raise ValueError(f'incompatible history map {name}')
-        records = {}
-        for raw in payload.get('records', []):
-            row, col = self._validate_cell(raw['row'], raw['col'])
-            record = self._record_defaults(row, col)
-            record.update({
-                'historical_max': self._clamped_value(
-                    raw['historical_max'], 'historical_max'),
-                'detection_count': max(
-                    0, int(raw.get('detection_count', 0))),
-                'last_detected': raw.get('last_detected'),
-                'last_visited': raw.get('last_visited'),
-                'last_phase': str(raw.get('last_phase', '')),
-                'visit_count': max(0, int(raw.get('visit_count', 0))),
-                'lrs_visit_count': max(
-                    0, int(raw.get('lrs_visit_count', 0))),
-                'lrs_last_visited': raw.get('lrs_last_visited'),
-                'lrs_value_mean': self._clamped_value(
-                    raw.get('lrs_value_mean', 0.0), 'lrs_value_mean'),
-                'lrs_value_m2': max(
-                    0.0, float(raw.get('lrs_value_m2', 0.0))),
-            })
-            for name in ('last_detected', 'last_visited',
-                         'lrs_last_visited'):
-                if record[name] is not None:
-                    record[name] = self._finite_timestamp(
-                        record[name], name)
-            if not math.isfinite(record['lrs_value_m2']):
-                raise ValueError('lrs_value_m2 must be finite')
-            records[self._key(row, col)] = record
-
-        history_mean = np.zeros((self.height, self.width), dtype=float)
-        history_recent = np.zeros((self.height, self.width), dtype=float)
-        history_count = 0
-        if version >= 2:
-            history_count = int(payload.get('history_count', 0))
-            if history_count < 0:
-                raise ValueError('history_count must be non-negative')
-            raw_mean = np.asarray(
-                payload.get('history_mean', []), dtype=float)
-            if raw_mean.size != self.width * self.height:
-                raise ValueError('history_mean has an incompatible size')
-            if not np.all(np.isfinite(raw_mean)):
-                raise ValueError('history_mean contains non-finite values')
-            history_mean = np.clip(
-                raw_mean.reshape(self.height, self.width), 0.0, 1.0)
-            history_mean[~self.free] = 0.0
-            if version == 2:
-                # Version 2 has no recent EMA. Seeding it from the preserved
-                # long-term mean gives migration users useful severity while
-                # keeping the new confirmed-event recurrence state empty.
-                history_recent = history_mean.copy()
-            else:
-                raw_recent = np.asarray(
-                    payload.get('history_recent', []), dtype=float)
-                if raw_recent.size != self.width * self.height:
-                    raise ValueError(
-                        'history_recent has an incompatible size')
-                if not np.all(np.isfinite(raw_recent)):
-                    raise ValueError(
-                        'history_recent contains non-finite values')
-                history_recent = np.clip(
-                    raw_recent.reshape(self.height, self.width), 0.0, 1.0)
-                history_recent[~self.free] = 0.0
-
-        confirmed_peak_events = {}
-        confirmed_event_sequence = 0
-        if version >= 3:
-            stored_sequence = int(
-                payload.get('confirmed_event_sequence', 0))
-            if stored_sequence < 0:
-                raise ValueError(
-                    'confirmed_event_sequence must be non-negative')
-            sequences = set()
-            for raw in payload.get('confirmed_peak_events', []):
-                event_id = str(raw['event_id'])
-                if not event_id:
-                    raise ValueError('confirmed event id must not be empty')
-                if event_id in confirmed_peak_events:
-                    raise ValueError('duplicate confirmed event id')
-                sequence = int(raw['sequence'])
-                if sequence <= 0 or sequence in sequences:
-                    raise ValueError('invalid confirmed event sequence')
-                row, col = self._validate_cell(
-                    raw['row'], raw['col'], require_free=True)
-                confirmed_peak_events[event_id] = {
-                    'event_id': event_id,
-                    'sequence': sequence,
-                    'row': row,
-                    'col': col,
-                    'value': self._clamped_value(
-                        raw['value'], 'confirmed peak value'),
-                    'timestamp': self._finite_timestamp(
-                        raw['timestamp'], 'confirmed peak timestamp'),
-                }
-                sequences.add(sequence)
-            maximum_sequence = max(sequences, default=0)
-            if stored_sequence < maximum_sequence:
-                raise ValueError(
-                    'confirmed_event_sequence precedes stored events')
-            confirmed_event_sequence = stored_sequence
-
-        # Commit only after the complete payload has been validated.
-        self.records = records
-        self.history_mean = history_mean
-        self.history_recent = history_recent
-        self.history_count = history_count
-        self.confirmed_peak_events = confirmed_peak_events
-        self.confirmed_event_sequence = confirmed_event_sequence
-        return True
 
     def reset(self):
         self.records.clear()
@@ -683,65 +519,3 @@ class GasHistoryStore:
         self.confirmed_peak_events.clear()
         self.confirmed_event_sequence = 0
 
-    def clear(self):
-        self.reset()
-        self.save()
-
-
-def distance(first, second):
-    return math.hypot(first[0] - second[0], first[1] - second[1])
-
-
-def history_adjusted_cycle(base_points, history_points, replace_radius,
-                           start_xy):
-    """Replace nearby base points, insert distant points, and rotate a cycle.
-
-    Returns ``(ordered_points, replacements, additions)``. Points are ``(x,y)``
-    tuples. A large assignment penalty first maximizes valid one-to-one
-    replacements and then minimizes their total distance.
-    """
-    route = [tuple(point) for point in base_points]
-    history = [tuple(point) for point in history_points]
-    replacements = []
-    additions = []
-    if not route:
-        return history, replacements, history
-
-    replaced_history = set()
-    if history:
-        distances = np.asarray([
-            [distance(hotspot, base) for base in route]
-            for hotspot in history
-        ], dtype=float)
-        penalty = 1.0e6
-        assignment_cost = distances + (distances > replace_radius) * penalty
-        history_indices, base_indices = linear_sum_assignment(assignment_cost)
-        for history_index, base_index in zip(history_indices, base_indices):
-            separation = float(distances[history_index, base_index])
-            if separation <= replace_radius:
-                original = route[base_index]
-                route[base_index] = history[history_index]
-                replaced_history.add(int(history_index))
-                replacements.append(
-                    (original, history[history_index], separation))
-
-    for history_index, hotspot in enumerate(history):
-        if history_index in replaced_history:
-            continue
-        best = None
-        for index, first in enumerate(route):
-            second = route[(index + 1) % len(route)]
-            increase = (
-                distance(first, hotspot) + distance(hotspot, second) -
-                distance(first, second))
-            key = (increase, index)
-            if best is None or key < best[0]:
-                best = (key, index + 1)
-        route.insert(best[1], hotspot)
-        additions.append(hotspot)
-
-    start_index = min(
-        range(len(route)),
-        key=lambda index: (distance(route[index], start_xy), index))
-    route = route[start_index:] + route[:start_index]
-    return route, replacements, additions
