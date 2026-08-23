@@ -1,0 +1,43 @@
+environment:
+  world: worlds/empty_50m/empty_lrs_50m.world
+  map: maps/empty_50m/map.yaml
+  navigation_profile: config/navigation/empty_fast.yaml
+  robot_spawn: {x: 0.0, y: 0.0, z: 0.01, yaw: 0.0}
+
+gas_environment:
+  source_mode: recurrent_hotspots_after_peak
+  source_enabled: false
+  source_x: 10.0
+  source_y: 10.0
+  source_strength: 1.0
+  source_sigma: 5.0
+  source_random_seed: -1
+  source_random_sigma_min: 4.0
+  source_random_sigma_max: 7.0
+  source_random_min_separation: 0.0
+  source_random_detection_threshold: 0.2
+  source_hotspot_centers: [10.0, 10.0, 40.0, 10.0, 15.0, 40.0, 40.0, 40.0]
+  source_hotspot_weights: [0.4, 0.3, 0.2, 0.1]
+  source_hotspot_jitter_sigma: 3.0
+  persist_source_state: true
+  source_state_file: ~/.ros/icir_cleanroom/gas_source_state.json
+  map_min_x: 0.0
+  map_max_x: 50.0
+  map_min_y: 0.0
+  map_max_y: 50.0
+  ground_truth_resolution: 0.1
+  gmrf_resolution: 1.0
+  sampling_clearance: 0.25
+  robot_start_x: 0.0
+  robot_start_y: 0.0
+  log_concentration_min: -4.0
+
+lrs:
+  lrs_stride_cells: 10
+  lrs_min_x: 0.0
+  lrs_max_x: 50.0
+  lrs_min_y: 0.0
+  lrs_max_y: 50.0
+  robot_start_x: 0.0
+  robot_start_y: 0.0
+  tsp_time_limit: 60.0

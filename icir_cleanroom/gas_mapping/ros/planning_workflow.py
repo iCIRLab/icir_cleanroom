@@ -33,7 +33,8 @@ class PlanningWorkflow:
                     f'LRS reward route worker failed: {outcome.error!r}; '
                     '최단 coverage fallback을 사용합니다')
                 route_plan = lrs_coverage_fallback(
-                    context['points'], context['current_xy'])
+                    context['points'], context['current_xy'],
+                    distance_fn=context['distance_fn'])
             else:
                 route_plan = outcome.result
             self.controller.finish_lrs_route_planning(route_plan, context)
@@ -73,4 +74,3 @@ class PlanningWorkflow:
 
 
 __all__ = ['PlanningWorkflow']
-

@@ -39,6 +39,9 @@ class PeakWorkflow:
             return
         neighbors = self.controller.gmrf.neighbor_variables(
             self.controller.peak_anchor_variable)
+        neighbors = [
+            variable for variable in neighbors
+            if variable in self.controller.navigation_goal_variables]
         blocked = [variable for variable in neighbors
                    if variable in self.controller.unreachable_variables]
         if blocked:
@@ -196,4 +199,3 @@ class PeakWorkflow:
 
 
 __all__ = ['PeakWorkflow']
-

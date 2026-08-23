@@ -1,0 +1,43 @@
+environment:
+  world: worlds/aws_small_warehouse/small_warehouse.world
+  map: maps/aws_small_warehouse/map.yaml
+  navigation_profile: config/navigation/aws_warehouse_safe.yaml
+  robot_spawn: {x: 0.0, y: 0.0, z: 0.01, yaw: 0.0}
+
+gas_environment:
+  source_mode: recurrent_hotspots_after_peak
+  source_enabled: false
+  source_x: 0.0
+  source_y: 0.0
+  source_strength: 1.0
+  source_sigma: 2.0
+  source_random_seed: -1
+  source_random_sigma_min: 1.5
+  source_random_sigma_max: 3.0
+  source_random_min_separation: 0.0
+  source_random_detection_threshold: 0.2
+  source_hotspot_centers: [-5.0, -5.0, 5.0, -5.0, -4.0, 6.0, 4.0, 6.0]
+  source_hotspot_weights: [0.25, 0.25, 0.25, 0.25]
+  source_hotspot_jitter_sigma: 1.0
+  persist_source_state: true
+  source_state_file: ~/.ros/icir_cleanroom/aws_small_warehouse_gas_source_state.json
+  map_min_x: -7.0
+  map_max_x: 7.0
+  map_min_y: -10.0
+  map_max_y: 10.0
+  ground_truth_resolution: 0.1
+  gmrf_resolution: 0.5
+  sampling_clearance: 0.3
+  robot_start_x: 0.0
+  robot_start_y: 0.0
+  log_concentration_min: -4.0
+
+lrs:
+  lrs_stride_cells: 10
+  lrs_min_x: -6.0
+  lrs_max_x: 6.0
+  lrs_min_y: -9.0
+  lrs_max_y: 9.0
+  robot_start_x: 0.0
+  robot_start_y: 0.0
+  tsp_time_limit: 60.0

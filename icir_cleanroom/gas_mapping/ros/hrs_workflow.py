@@ -12,12 +12,15 @@ class HrsWorkflow:
 
     def available_variables(self):
         return self.controller.hrs_manager.available_variables(
-            len(self.controller.gmrf.var_cells), self.controller.sampled_variables)
+            len(self.controller.gmrf.var_cells),
+            self.controller.sampled_variables,
+            self.controller.navigation_goal_variables)
 
     def build_candidates(self):
         return self.controller.hrs_manager.build_candidates(
             self.controller.gmrf, self.controller.sampled_variables, self.controller.hrs_ucb_k,
-            self.controller.hrs_candidate_count)
+            self.controller.hrs_candidate_count,
+            self.controller.navigation_goal_variables)
 
     def start_hrs_planning(self):
         if self.controller.planning_executor.active_task is not None:
@@ -110,7 +113,8 @@ class HrsWorkflow:
     def evaluate_hrs_stop(self):
         converged, variable, maximum, gap = self.controller.hrs_manager.evaluate_stop(
             self.controller.gmrf, self.controller.sampled_variables, self.controller.event_best_observed,
-            float(self.controller.hrs_ucb_k), float(self.controller.hrs_stop_margin))
+            float(self.controller.hrs_ucb_k), float(self.controller.hrs_stop_margin),
+            self.controller.navigation_goal_variables)
         if variable is None:
             return True, (
                 f'HRS 수렴 판정: alert_cycle={self.controller.hrs_cycles_in_alert}, '
@@ -128,4 +132,3 @@ class HrsWorkflow:
 
 
 __all__ = ['HrsWorkflow']
-

@@ -344,17 +344,20 @@ class ControllerVisualization:
         self.controller.hrs_route_pub.publish(path)
 
     def publish_hrs_status(self):
-        if self.controller.gmrf is None:
+        if (self.controller.gmrf is None or
+                self.controller.navigation_goal_variables is None):
             return
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.controller.get_clock().now().to_msg()
         marker.ns = 'gas_mapping_hrs_status'
         marker.id = 0
-        marker.type = Marker.POINTS
+        marker.type = Marker.CUBE_LIST
         marker.action = Marker.ADD
+        marker.pose.orientation.w = 1.0
         marker.scale.x = marker.scale.y = 0.12
-        for variable in range(len(self.controller.gmrf.var_cells)):
+        marker.scale.z = 0.02
+        for variable in sorted(self.controller.navigation_goal_variables):
             x, y = self.controller.gmrf.cell_center(variable)
             marker.points.append(Point(x=x, y=y, z=0.10))
             if variable in self.controller.unreachable_variables:

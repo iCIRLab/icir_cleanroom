@@ -1,7 +1,7 @@
 """ROS adapter that publishes the low-resolution sampling route."""
 import copy
-import math
 
+import numpy as np
 import rclpy
 from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
@@ -9,6 +9,9 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from visualization_msgs.msg import Marker
 
+from ..mapping.grid_geometry import GridGeometry
+from ..mapping.lattice import field_cell_lattice, sampling_lattice
+from ..mapping.path_distance import SamplingDistanceOracle
 from ..planning.lrs_tsp import LrsPoint, solve_lrs_tsp
 
 
@@ -23,21 +26,23 @@ class LrsPathPlannerNode(Node):
     def __init__(self):
         super().__init__('lrs_path_planner_node')
         defaults = {
-            'lrs_spacing': 10.0,    # LRS(격자) 샘플링 지점들 사이의 간격(m)
+            'lrs_stride_cells': 10, # LRS 지점 사이의 GMRF 셀 수(alpha)
             'lrs_min_x': 0.0,       # 격자 생성 범위 x축 최소(m)
             'lrs_max_x': 50.0,      # 격자 생성 범위 x축 최대(m)
             'lrs_min_y': 0.0,       # 격자 생성 범위 y축 최소(m)
             'lrs_max_y': 50.0,      # 격자 생성 범위 y축 최대(m)
             'robot_start_x': 0.0,   # TSP 경로 계산 시 로봇 출발 x 위치
             'robot_start_y': 0.0,   # TSP 경로 계산 시 로봇 출발 y 위치
-            'goal_clearance': 0.25, # 후보 지점이 장애물과 유지해야할 최소 거리(m)
             'tsp_time_limit': 60.0, # TSP 최적 경로 계산 제한 시간(초)
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
             setattr(self, name, self.get_parameter(name).value)
-        if self.lrs_spacing <= 0.0 or self.goal_clearance < 0.0:
-            raise ValueError('LRS spacing must be positive and clearance non-negative')
+        if (isinstance(self.lrs_stride_cells, bool) or
+                not isinstance(self.lrs_stride_cells, int) or
+                self.lrs_stride_cells <= 0):
+            raise ValueError(
+                'lrs_stride_cells must be a positive integer')
 
         self.path_pub = self.create_publisher(
             Path, '/gas_mapping/lrs/route', transient_qos())
@@ -46,26 +51,54 @@ class LrsPathPlannerNode(Node):
         self.points_log_pub = self.create_publisher(
             Marker, '/gas_mapping/lrs/status_log', transient_qos())
         self.create_subscription(
-            OccupancyGrid, '/map', self.map_callback, transient_qos())
+            OccupancyGrid, '/gas_mapping/sampling_domain',
+            self.sampling_map_callback, transient_qos())
+        self.create_subscription(
+            OccupancyGrid, '/gas_mapping/navigation_goal_domain',
+            self.navigation_goal_map_callback, transient_qos())
+        self.create_subscription(
+            OccupancyGrid, '/gas_mapping/gmrf_domain',
+            self.gmrf_map_callback, transient_qos())
+        self.sampling_map = None
+        self.navigation_goal_map = None
+        self.gmrf_map = None
         self.planned = False
 
-    def map_callback(self, msg):
-        if self.planned:
+    def sampling_map_callback(self, msg):
+        self.sampling_map = copy.deepcopy(msg)
+        self.try_plan()
+
+    def gmrf_map_callback(self, msg):
+        self.gmrf_map = copy.deepcopy(msg)
+        self.try_plan()
+
+    def navigation_goal_map_callback(self, msg):
+        self.navigation_goal_map = copy.deepcopy(msg)
+        self.try_plan()
+
+    def try_plan(self):
+        if (self.planned or self.sampling_map is None or
+                self.navigation_goal_map is None or self.gmrf_map is None):
             return
-        points = self.build_points(msg)
-        expected_rows = int(round(
-            (self.lrs_max_y - self.lrs_min_y) / self.lrs_spacing)) + 1
-        expected_cols = int(round(
-            (self.lrs_max_x - self.lrs_min_x) / self.lrs_spacing)) + 1
-        expected_count = expected_rows * expected_cols
-        if len(points) != expected_count:
+        points, nominal_count, distance_oracle = self.build_points(
+            self.sampling_map, self.navigation_goal_map, self.gmrf_map)
+        if len(points) < 3:
             raise RuntimeError(
-                f'LRS domain expected {expected_count} clear points, '
+                'LRS requires at least 3 navigation goal points, '
                 f'found {len(points)}')
 
+        solver_arguments = {}
+        if len(points) != nominal_count:
+            solver_arguments['distance_matrix'] = distance_oracle.matrix(
+                points)
+            solver_arguments['start_distances'] = [
+                distance_oracle.distance(
+                    (self.robot_start_x, self.robot_start_y),
+                    (point.x, point.y))
+                for point in points]
         result = solve_lrs_tsp(
             points, (self.robot_start_x, self.robot_start_y),
-            self.tsp_time_limit)
+            self.tsp_time_limit, **solver_arguments)
         ordered = [points[index] for index in result.tour]
         self.publish_route(ordered)
         self.publish_points(ordered)
@@ -75,34 +108,42 @@ class LrsPathPlannerNode(Node):
             f'objective={result.objective:.3f}m, gap={result.gap:.6f}, '
             f'cuts={result.cuts}')
 
-    def is_clear(self, msg, x, y):
-        radius = int(math.ceil(self.goal_clearance / msg.info.resolution))
-        col = int((x - msg.info.origin.position.x) / msg.info.resolution)
-        row = int((y - msg.info.origin.position.y) / msg.info.resolution)
-        for rr in range(row - radius, row + radius + 1):
-            for cc in range(col - radius, col + radius + 1):
-                if (rr < 0 or cc < 0 or rr >= msg.info.height or
-                        cc >= msg.info.width):
-                    return False
-                if msg.data[rr * msg.info.width + cc] != 0:
-                    return False
-        return True
+    @staticmethod
+    def domain_mask(domain_map, description):
+        geometry = GridGeometry.from_message(domain_map)
+        values = list(domain_map.data)
+        expected = geometry.width * geometry.height
+        if len(values) != expected:
+            raise ValueError(
+                f'{description} data size does not match its geometry')
+        return geometry, np.asarray(values, dtype=np.int16).reshape(
+            geometry.height, geometry.width) == 0
 
-    def build_points(self, msg):
-        points = []
-        row = 0
-        y = self.lrs_min_y
-        while y <= self.lrs_max_y + 1.0e-9:
-            col = 0
-            x = self.lrs_min_x
-            while x <= self.lrs_max_x + 1.0e-9:
-                if self.is_clear(msg, x, y):
-                    points.append(LrsPoint(row, col, x, y))
-                x += self.lrs_spacing
-                col += 1
-            y += self.lrs_spacing
-            row += 1
-        return points
+    def build_points(self, sampling_map, navigation_goal_map, gmrf_map):
+        sampling_geometry, traversal_mask = self.domain_mask(
+            sampling_map, 'sampling domain')
+        goal_geometry, goal_mask = self.domain_mask(
+            navigation_goal_map, 'navigation goal domain')
+        if goal_geometry != sampling_geometry:
+            raise ValueError(
+                'navigation goal and sampling domain geometries differ')
+        if np.any(goal_mask & ~traversal_mask):
+            raise ValueError(
+                'navigation goal domain must be a sampling domain subset')
+        gmrf_geometry = GridGeometry.from_message(gmrf_map)
+        nominal = field_cell_lattice(
+            gmrf_geometry,
+            self.lrs_min_x, self.lrs_max_x,
+            self.lrs_min_y, self.lrs_max_y, self.lrs_stride_cells)
+        accessible = sampling_lattice(
+            gmrf_geometry, goal_geometry, goal_mask,
+            self.lrs_min_x, self.lrs_max_x,
+            self.lrs_min_y, self.lrs_max_y, self.lrs_stride_cells)
+        points = [LrsPoint(
+            point.lattice_row, point.lattice_col, point.x, point.y)
+            for point in accessible]
+        return points, len(nominal), SamplingDistanceOracle(
+            sampling_geometry, traversal_mask)
 
     def publish_route(self, ordered):
         msg = Path()

@@ -14,8 +14,12 @@ class HrsManager:
         self.state.active_route = None
         self.state.cycle_started_ns = None
 
-    def available_variables(self, variable_count, sampled_variables):
-        return (set(range(int(variable_count))) - set(sampled_variables) -
+    def available_variables(
+            self, variable_count, sampled_variables, eligible_variables=None):
+        eligible = (set(range(int(variable_count)))
+                    if eligible_variables is None
+                    else set(eligible_variables))
+        return (eligible - set(sampled_variables) -
                 self.state.unreachable_variables)
 
     def record_failure(self, variable, max_failures):
@@ -32,12 +36,14 @@ class HrsManager:
         self.state.batch_successes += 1
 
     def build_candidates(
-            self, gmrf, sampled_variables, ucb_coefficient, count):
+            self, gmrf, sampled_variables, ucb_coefficient, count,
+            eligible_variables=None):
         potentials = normalized_ucb(
             gmrf.solution, gmrf.variance, float(ucb_coefficient))
         candidates = []
         for variable in self.available_variables(
-                len(gmrf.var_cells), sampled_variables):
+                len(gmrf.var_cells), sampled_variables,
+                eligible_variables):
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
             candidates.append(HrsCell(
@@ -77,9 +83,9 @@ class HrsManager:
 
     def evaluate_stop(
             self, gmrf, sampled_variables, best_observed,
-            ucb_coefficient, margin):
+            ucb_coefficient, margin, eligible_variables=None):
         available = self.available_variables(
-            len(gmrf.var_cells), sampled_variables)
+            len(gmrf.var_cells), sampled_variables, eligible_variables)
         return peak_search_status(
             gmrf.solution, gmrf.variance, available, best_observed,
             ucb_coefficient, margin)

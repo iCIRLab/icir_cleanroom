@@ -30,11 +30,14 @@
     <exec_depend>launch</exec_depend>
     <exec_depend>launch_ros</exec_depend>
     <exec_depend>nav2_bringup</exec_depend>
+    <exec_depend>nav2_map_server</exec_depend>
+    <exec_depend>nav2_lifecycle_manager</exec_depend>
     <exec_depend>robot_state_publisher</exec_depend>
     <exec_depend>rviz2</exec_depend>
 
     <test_depend>ament_cmake_pytest</test_depend>
     <test_depend>python3-pytest</test_depend>
+    <test_depend>python3-pil</test_depend>
 
     <export>
         <build_type>ament_cmake</build_type>

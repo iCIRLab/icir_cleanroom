@@ -1,6 +1,7 @@
 # Public ROS contract preserved by the gas-mapping refactor.
 executables:
   - gas_empty_map_node.py
+  - gas_environment_node.py
   - lrs_path_planner_node.py
   - gas_mapping_controller_node.py
 launch: cleanroom_empty.launch.py
@@ -11,10 +12,11 @@ topics:
       /gas_sensor/detected_concentration: std_msgs/msg/Float64
   environment:
     publishers:
-      /map: nav_msgs/msg/OccupancyGrid
       /gas_mapping/ground_truth: nav_msgs/msg/OccupancyGrid
       /gas_mapping/ground_truth_log: nav_msgs/msg/OccupancyGrid
       /gas_mapping/gmrf_domain: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/sampling_domain: nav_msgs/msg/OccupancyGrid
+      /gas_mapping/navigation_goal_domain: nav_msgs/msg/OccupancyGrid
       /gas_mapping/source: visualization_msgs/msg/Marker
       /gas_mapping/sensor_concentration: std_msgs/msg/Float64
   lrs_planner:

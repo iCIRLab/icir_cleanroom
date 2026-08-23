@@ -34,13 +34,17 @@ class LrsWorkflow:
             for goal in self.controller.base_lrs_goals]
         history_points = [
             (record['x'], record['y'])
-            for record in self.controller.active_history_regions]
+            for record in self.controller.active_history_regions
+            if self.controller.is_navigation_goal_position(
+                record['x'], record['y'])]
         current_xy = (
             self.controller.latest_pose.pose.position.x,
             self.controller.latest_pose.pose.position.y)
+        distance_fn = self.controller.sampling_distance.distance
         adjusted, replacements, additions = history_adjusted_cycle(
             base_points, history_points,
-            float(self.controller.lrs_history_replace_radius), current_xy)
+            float(self.controller.lrs_history_replace_radius), current_xy,
+            distance_fn)
         points = self.controller.prepare_adaptive_lrs_points(adjusted)
         if self.controller.planning_executor.active_task is not None:
             raise RuntimeError('another route-planning job is already active')
@@ -49,8 +53,9 @@ class LrsWorkflow:
             'history_points': history_points,
             'replacements': replacements, 'additions': additions,
             'points': points, 'current_xy': current_xy,
+            'distance_fn': distance_fn,
             'original_baseline_length': self.controller.closed_cycle_reference_length(
-                base_points, current_xy),
+                base_points, current_xy, distance_fn),
         }
         self.controller.lrs_goals = []
         self.controller.lrs_status_values = []
@@ -87,7 +92,7 @@ class LrsWorkflow:
             solve_lrs_priority_route, points, current_xy,
             int(self.controller.lrs_priority_candidate_count),
             int(self.controller.lrs_priority_count),
-            float(self.controller.lrs_route_length_ratio))
+            float(self.controller.lrs_route_length_ratio), distance_fn)
 
     def prepare_adaptive_lrs_points(self, adjusted_points):
         """Calculate active-set LRS rewards before threaded route solving."""
@@ -157,9 +162,9 @@ class LrsWorkflow:
         self.controller.send_current_goal()
 
     @staticmethod
-    @staticmethod
-    def closed_cycle_reference_length(points, start_xy):
-        return LrsManager.closed_cycle_reference_length(points, start_xy)
+    def closed_cycle_reference_length(points, start_xy, distance_fn=None):
+        return LrsManager.closed_cycle_reference_length(
+            points, start_xy, distance_fn)
 
     def finish_lrs_navigation(self):
         self.controller.returning = False

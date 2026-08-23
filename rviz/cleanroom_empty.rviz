@@ -21,6 +21,20 @@ Visualization Manager:
       Enabled: true
       Name: NavigationMap
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /map}
+    - Alpha: 0.35
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: SamplingDomain
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/sampling_domain}
+    - Alpha: 0.45
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: false
+      Name: NavigationGoalDomain
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/navigation_goal_domain}
     - Alpha: 0.48
       Class: rviz_default_plugins/Map
       Color Scheme: costmap

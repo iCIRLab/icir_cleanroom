@@ -12,7 +12,6 @@
       <ros><namespace>/gazebo</namespace></ros>
       <update_rate>1.0</update_rate>
     </plugin>
-
     <model name="gas_obstacle_wall_left">
       <static>true</static><pose>-2.5 25 0.5 0 0 0</pose>
       <link name="link">

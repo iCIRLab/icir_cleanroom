@@ -24,6 +24,8 @@ from ..config import declare_controller_config
 from ..history import GasHistoryStore
 from ..mapping.gmrf import GmrfGrid
 from ..mapping.gmrf_service import GmrfService
+from ..mapping.grid_geometry import GridGeometry
+from ..mapping.path_distance import SamplingDistanceOracle
 from ..models import (
     HrsRuntimeState, LrsRuntimeState, MappingEventState, NavigationState,
     PeakSearchState, SourceTransitionState, StateField)
@@ -112,6 +114,12 @@ class GasMappingControllerNode(Node):
             OccupancyGrid, '/gas_mapping/gmrf_domain', self.map_callback,
             transient_qos())
         self.create_subscription(
+            OccupancyGrid, '/gas_mapping/sampling_domain',
+            self.sampling_map_callback, transient_qos())
+        self.create_subscription(
+            OccupancyGrid, '/gas_mapping/navigation_goal_domain',
+            self.navigation_goal_map_callback, transient_qos())
+        self.create_subscription(
             PoseStamped, '/gas_sensor/sensor_pose', self.pose_callback, 30)
         self.create_subscription(
             Float64, '/gas_mapping/sensor_concentration',
@@ -131,6 +139,14 @@ class GasMappingControllerNode(Node):
             Trigger, '/gas_mapping/source/advance')
 
         self.map_msg = None
+        self.sampling_map_msg = None
+        self.sampling_geometry = None
+        self.sampling_mask = None
+        self.sampling_distance = None
+        self.navigation_goal_map_msg = None
+        self.navigation_goal_geometry = None
+        self.navigation_goal_mask = None
+        self.navigation_goal_variables = None
         self.gmrf = None
         self.history = None
         self.base_lrs_goals = []
@@ -227,6 +243,7 @@ class GasMappingControllerNode(Node):
             self.observation_variance_floor, self.cardinal_weight,
             self.diagonal_weight)
         self.gmrf_service.attach(self.gmrf)
+        self.refresh_navigation_goal_variables()
         self.history = GasHistoryStore(
             self.history_file, msg, float(self.hazard_threshold),
             recent_alpha=float(self.history_recent_alpha))
@@ -246,7 +263,82 @@ class GasMappingControllerNode(Node):
         self.publish_history()
         self.publish_hrs_status()
         self.get_logger().info(
-            f'GMRF 생성: {len(self.gmrf.solution)} free variables')
+            f'GMRF 생성: {len(self.gmrf.solution)} field variables')
+
+    def sampling_map_callback(self, msg):
+        self.sampling_map_msg = copy.deepcopy(msg)
+        self.sampling_geometry = GridGeometry.from_message(msg)
+        values = np.asarray(msg.data, dtype=np.int16)
+        expected = self.sampling_geometry.width * self.sampling_geometry.height
+        if values.size != expected:
+            self.get_logger().error(
+                'Sampling domain data size does not match its geometry')
+            self.sampling_distance = None
+            return
+        self.sampling_mask = values.reshape(
+            self.sampling_geometry.height,
+            self.sampling_geometry.width) == 0
+        self.sampling_distance = SamplingDistanceOracle(
+            self.sampling_geometry, self.sampling_mask)
+        if (self.navigation_goal_geometry is not None and
+                self.navigation_goal_geometry != self.sampling_geometry):
+            self.get_logger().error(
+                'Navigation goal and sampling domain geometries differ')
+            self.navigation_goal_variables = None
+
+    def navigation_goal_map_callback(self, msg):
+        self.navigation_goal_map_msg = copy.deepcopy(msg)
+        self.navigation_goal_geometry = GridGeometry.from_message(msg)
+        values = np.asarray(msg.data, dtype=np.int16)
+        expected = (
+            self.navigation_goal_geometry.width *
+            self.navigation_goal_geometry.height)
+        if values.size != expected:
+            self.get_logger().error(
+                'Navigation goal domain data size does not match its '
+                'geometry')
+            self.navigation_goal_variables = None
+            return
+        if (self.sampling_geometry is not None and
+                self.navigation_goal_geometry != self.sampling_geometry):
+            self.get_logger().error(
+                'Navigation goal and sampling domain geometries differ')
+            self.navigation_goal_variables = None
+            return
+        self.navigation_goal_mask = values.reshape(
+            self.navigation_goal_geometry.height,
+            self.navigation_goal_geometry.width) == 0
+        self.refresh_navigation_goal_variables()
+        self.publish_hrs_status()
+
+    def is_sampling_position(self, x, y):
+        if self.sampling_geometry is None or self.sampling_mask is None:
+            return False
+        row, col = self.sampling_geometry.world_to_cell(x, y)
+        return bool(
+            self.sampling_geometry.contains_cell(row, col) and
+            self.sampling_mask[row, col])
+
+    def is_navigation_goal_position(self, x, y):
+        if (self.navigation_goal_geometry is None or
+                self.navigation_goal_mask is None):
+            return False
+        row, col = self.navigation_goal_geometry.world_to_cell(x, y)
+        return bool(
+            self.navigation_goal_geometry.contains_cell(row, col) and
+            self.navigation_goal_mask[row, col])
+
+    def refresh_navigation_goal_variables(self):
+        if self.gmrf is None or self.navigation_goal_mask is None:
+            return
+        self.navigation_goal_variables = {
+            variable for variable in range(len(self.gmrf.var_cells))
+            if self.is_navigation_goal_position(
+                *self.gmrf.cell_center(variable))}
+        self.get_logger().info(
+            f'Navigation goal domain aligned to GMRF: '
+            f'{len(self.navigation_goal_variables)}/'
+            f'{len(self.gmrf.var_cells)} cells')
 
     def pose_callback(self, msg):
         self.latest_pose = copy.deepcopy(msg)
@@ -257,6 +349,8 @@ class GasMappingControllerNode(Node):
     def try_start(self):
         if (self.phase != 'WAITING' or not self.base_lrs_goals or
                 self.gmrf is None or self.latest_pose is None or
+                self.sampling_distance is None or
+                self.navigation_goal_variables is None or
                 not self.nav2.server_is_ready()):
             return
         self.start_timer.cancel()

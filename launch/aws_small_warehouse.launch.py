@@ -1,4 +1,4 @@
-"""Backward-compatible entry point for the empty 50 m environment."""
+"""Compatibility entry point for the AWS Small Warehouse environment."""
 
 import os
 
@@ -9,8 +9,9 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
-    package_dir = get_package_share_directory('icir_cleanroom')
+    common_launch = os.path.join(
+        get_package_share_directory('icir_cleanroom'),
+        'launch', 'gas_mapping.launch.py')
     return LaunchDescription([IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(
-            package_dir, 'launch', 'gas_mapping.launch.py')),
-        launch_arguments={'environment': 'empty_50m'}.items())])
+        PythonLaunchDescriptionSource(common_launch),
+        launch_arguments={'environment': 'aws_small_warehouse'}.items())])
