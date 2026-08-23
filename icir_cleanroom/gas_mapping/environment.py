@@ -5,6 +5,8 @@ import math
 import os
 import tempfile
 
+from .mapping.lattice import inclusive_axis
+
 SOURCE_PARAMETER_NAMES = (
     'source_enabled', 'source_x', 'source_y',
     'source_strength', 'source_sigma',
@@ -12,8 +14,7 @@ SOURCE_PARAMETER_NAMES = (
 RANDOM_SOURCE_PARAMETER_NAMES = (
     'source_mode', 'source_random_seed',
     'source_random_sigma_min', 'source_random_sigma_max',
-    'source_random_min_separation', 'source_random_lrs_spacing',
-    'source_random_detection_threshold',
+    'source_random_min_separation', 'source_random_detection_threshold',
 )
 HOTSPOT_SOURCE_PARAMETER_NAMES = (
     'source_hotspot_centers', 'source_hotspot_weights',
@@ -60,12 +61,10 @@ def validated_random_source_config(config):
     sigma_min = float(config['source_random_sigma_min'])
     sigma_max = float(config['source_random_sigma_max'])
     min_separation = float(config['source_random_min_separation'])
-    lrs_spacing = float(config['source_random_lrs_spacing'])
     detection_threshold = float(
         config['source_random_detection_threshold'])
     numeric_values = (
-        sigma_min, sigma_max, min_separation, lrs_spacing,
-        detection_threshold)
+        sigma_min, sigma_max, min_separation, detection_threshold)
     if not all(math.isfinite(value) for value in numeric_values):
         raise ValueError('random source numeric parameters must be finite')
     if sigma_min <= 0.0 or sigma_max < sigma_min:
@@ -73,8 +72,6 @@ def validated_random_source_config(config):
             'source random sigma range must satisfy 0 < min <= max')
     if min_separation < 0.0:
         raise ValueError('source_random_min_separation must be non-negative')
-    if lrs_spacing <= 0.0:
-        raise ValueError('source_random_lrs_spacing must be positive')
     if not 0.0 <= detection_threshold <= 1.0:
         raise ValueError(
             'source_random_detection_threshold must be in [0, 1]')
@@ -84,7 +81,6 @@ def validated_random_source_config(config):
         'source_random_sigma_min': sigma_min,
         'source_random_sigma_max': sigma_max,
         'source_random_min_separation': min_separation,
-        'source_random_lrs_spacing': lrs_spacing,
         'source_random_detection_threshold': detection_threshold,
     }
 
@@ -136,25 +132,23 @@ def validated_hotspot_source_config(
     }
 
 
-def inclusive_axis(minimum, maximum, spacing):
-    if maximum < minimum:
-        raise ValueError('map maximum must not be less than map minimum')
-    count = int(math.floor((maximum - minimum) / spacing + 1e-9))
-    return [minimum + index * spacing for index in range(count + 1)]
-
-
 def random_source_is_lrs_detectable(
         state, min_x, max_x, min_y, max_y, lrs_spacing,
-        detection_threshold):
-    for y in inclusive_axis(min_y, max_y, lrs_spacing):
-        for x in inclusive_axis(min_x, max_x, lrs_spacing):
-            distance_sq = (
-                (x - state['source_x']) ** 2
-                + (y - state['source_y']) ** 2)
-            concentration = math.exp(
-                -distance_sq / (2.0 * state['source_sigma'] ** 2))
-            if concentration >= detection_threshold:
-                return True
+        detection_threshold, sampling_points=None):
+    points = sampling_points
+    if points is None:
+        points = [
+            (x, y)
+            for y in inclusive_axis(min_y, max_y, lrs_spacing)
+            for x in inclusive_axis(min_x, max_x, lrs_spacing)]
+    for x, y in points:
+        distance_sq = (
+            (x - state['source_x']) ** 2
+            + (y - state['source_y']) ** 2)
+        concentration = math.exp(
+            -distance_sq / (2.0 * state['source_sigma'] ** 2))
+        if concentration >= detection_threshold:
+            return True
     return False
 
 
@@ -162,7 +156,7 @@ def generate_random_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
         sigma_min, sigma_max, min_separation, lrs_spacing,
         detection_threshold, previous_position=None,
-        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
+        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, sampling_points=None):
     x_centers = inclusive_axis(min_x, max_x, gmrf_resolution)
     y_centers = inclusive_axis(min_y, max_y, gmrf_resolution)
     min_separation_sq = min_separation ** 2
@@ -181,7 +175,7 @@ def generate_random_source_state(
                 continue
         if random_source_is_lrs_detectable(
                 proposed, min_x, max_x, min_y, max_y, lrs_spacing,
-                detection_threshold):
+                detection_threshold, sampling_points):
             return proposed
     raise ValueError(
         f'could not generate a detectable random gas source in '
@@ -202,7 +196,7 @@ def generate_recurrent_hotspot_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
         sigma_min, sigma_max, lrs_spacing, detection_threshold,
         hotspot_centers, hotspot_weights, hotspot_jitter_sigma,
-        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
+        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, sampling_points=None):
     hotspots = [
         (hotspot_centers[index], hotspot_centers[index + 1])
         for index in range(0, len(hotspot_centers), 2)]
@@ -227,7 +221,7 @@ def generate_recurrent_hotspot_source_state(
             continue
         if random_source_is_lrs_detectable(
                 proposed, min_x, max_x, min_y, max_y, lrs_spacing,
-                detection_threshold):
+                detection_threshold, sampling_points):
             return proposed
     raise ValueError(
         f'could not generate a detectable recurrent-hotspot gas source in '
@@ -264,4 +258,3 @@ def save_source_state(path, state):
     finally:
         if temporary_path is not None and os.path.exists(temporary_path):
             os.unlink(temporary_path)
-

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 import time
 
+import numpy as np
 from mip import BINARY, CBC, Model, OptimizationStatus, minimize, xsum
 
 
@@ -44,18 +45,44 @@ def _components(node_count, selected_edges):
     return components, adjacency
 
 
-def solve_lrs_tsp(points, start_xy=(-5.0, -1.0), time_limit=60.0):
+def _validated_distance_matrix(distance_matrix, point_count):
+    matrix = np.asarray(distance_matrix, dtype=float)
+    if matrix.shape != (point_count, point_count):
+        raise ValueError(
+            'LRS distance matrix must have one row and column per point')
+    if not np.all(np.isfinite(matrix)) or np.any(matrix < 0.0):
+        raise ValueError('LRS distance matrix must be finite and non-negative')
+    if not np.allclose(matrix, matrix.T, rtol=0.0, atol=1.0e-9):
+        raise ValueError('LRS distance matrix must be symmetric')
+    if not np.allclose(np.diag(matrix), 0.0, rtol=0.0, atol=1.0e-9):
+        raise ValueError('LRS distance matrix diagonal must be zero')
+    if np.any(matrix[np.triu_indices(point_count, 1)] <= 0.0):
+        raise ValueError('distinct LRS points must have positive distance')
+    return matrix
+
+
+def solve_lrs_tsp(points, start_xy=(-5.0, -1.0), time_limit=60.0,
+                  distance_matrix=None, start_distances=None):
     """Solve P1 by adding violated subtour elimination constraints."""
     if len(points) < 3:
         raise ValueError('A closed TSP tour requires at least three LRS points')
 
     edges = []
-    for i, first in enumerate(points):
-        for j in range(i + 1, len(points)):
-            second = points[j]
-            if max(abs(first.row - second.row), abs(first.col - second.col)) == 1:
-                cost = math.hypot(first.x - second.x, first.y - second.y)
-                edges.append((i, j, cost))
+    if distance_matrix is None:
+        for i, first in enumerate(points):
+            for j in range(i + 1, len(points)):
+                second = points[j]
+                if max(abs(first.row - second.row),
+                       abs(first.col - second.col)) == 1:
+                    cost = math.hypot(
+                        first.x - second.x, first.y - second.y)
+                    edges.append((i, j, cost))
+    else:
+        matrix = _validated_distance_matrix(distance_matrix, len(points))
+        edges = [
+            (i, j, float(matrix[i, j]))
+            for i in range(len(points))
+            for j in range(i + 1, len(points))]
 
     model = Model(solver_name=CBC)
     model.verbose = 0
@@ -94,12 +121,18 @@ def solve_lrs_tsp(points, start_xy=(-5.0, -1.0), time_limit=60.0):
             model += xsum(internal) <= len(component) - 1
             cuts += 1
 
-    start = min(
-        range(len(points)),
-        key=lambda index: math.hypot(
-            points[index].x - start_xy[0], points[index].y - start_xy[1]
-        ),
-    )
+    if start_distances is None:
+        entry_costs = [math.hypot(
+            point.x - start_xy[0], point.y - start_xy[1])
+            for point in points]
+    else:
+        entry_costs = np.asarray(start_distances, dtype=float)
+        if (entry_costs.shape != (len(points),) or
+                not np.all(np.isfinite(entry_costs)) or
+                np.any(entry_costs < 0.0)):
+            raise ValueError(
+                'LRS start distances must be finite and non-negative')
+    start = min(range(len(points)), key=lambda index: entry_costs[index])
     tour = [start]
     previous = None
     current = start

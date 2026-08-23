@@ -5,18 +5,25 @@ import numpy as np
 from scipy.sparse import coo_matrix, diags
 from scipy.sparse.linalg import cg
 
+from .grid_geometry import GridGeometry
+
 
 class GmrfGrid:
     def __init__(self, map_msg, smoothness=1.0, background_precision=1.0,
                  background_mean=0.0, observation_variance_scale=0.01,
                  observation_variance_floor=0.001,
                  cardinal_weight=0.75, diagonal_weight=0.25):
-        self.width = map_msg.info.width
-        self.height = map_msg.info.height
-        self.resolution = map_msg.info.resolution
-        self.origin_x = map_msg.info.origin.position.x
-        self.origin_y = map_msg.info.origin.position.y
-        self.free = np.asarray(map_msg.data).reshape(self.height, self.width) == 0
+        self.geometry = GridGeometry.from_message(map_msg)
+        self.width = self.geometry.width
+        self.height = self.geometry.height
+        self.resolution = self.geometry.resolution
+        self.origin_x = self.geometry.origin_x
+        self.origin_y = self.geometry.origin_y
+        self.field_mask = (
+            np.asarray(map_msg.data).reshape(self.height, self.width) == 0)
+        # Compatibility alias while callers migrate from the old navigation-
+        # free interpretation to the gas-field interpretation.
+        self.free = self.field_mask
         self.cell_to_var = np.full((self.height, self.width), -1, dtype=np.int32)
         self.cell_to_var[self.free] = np.arange(np.count_nonzero(self.free))
         self.var_cells = np.argwhere(self.free)
@@ -87,8 +94,7 @@ class GmrfGrid:
         self.message_information = np.zeros(len(self.edge_source), dtype=float)
 
     def _nearest_variable(self, x, y):
-        col = int((x - self.origin_x) / self.resolution)
-        row = int((y - self.origin_y) / self.resolution)
+        row, col = self.geometry.world_to_cell(x, y)
         if 0 <= row < self.height and 0 <= col < self.width:
             variable = self.cell_to_var[row, col]
             if variable >= 0:
@@ -134,10 +140,7 @@ class GmrfGrid:
 
     def cell_center(self, variable):
         row, col = self.var_cells[int(variable)]
-        return (
-            self.origin_x + (float(col) + 0.5) * self.resolution,
-            self.origin_y + (float(row) + 0.5) * self.resolution,
-        )
+        return self.geometry.cell_center(row, col)
 
     def neighbor_variables(self, variable):
         """Return all valid 8-connected neighbors in row/column order."""

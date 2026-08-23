@@ -59,18 +59,20 @@ def _point_key(point):
     return int(point.row), int(point.col), int(point.variable)
 
 
-def _route_length(points, start_xy, close_cycle=True):
+def _route_length(points, start_xy, close_cycle=True, distance_fn=None):
+    distance_fn = distance_fn or _distance
     if not points:
         return 0.0
-    total = _distance(tuple(start_xy), _point_xy(points[0]))
+    total = distance_fn(tuple(start_xy), _point_xy(points[0]))
     for first, second in zip(points, points[1:]):
-        total += _distance(_point_xy(first), _point_xy(second))
+        total += distance_fn(_point_xy(first), _point_xy(second))
     if close_cycle:
-        total += _distance(_point_xy(points[-1]), _point_xy(points[0]))
+        total += distance_fn(
+            _point_xy(points[-1]), _point_xy(points[0]))
     return float(total)
 
 
-def _best_cycle_order(points, start_xy):
+def _best_cycle_order(points, start_xy, distance_fn=None):
     """Rotate and orient a cycle to minimize travel from the current pose."""
     if not points:
         return []
@@ -80,7 +82,8 @@ def _best_cycle_order(points, start_xy):
         for offset in range(len(direction)):
             ordered = direction[offset:] + direction[:offset]
             key = (
-                _route_length(ordered, start_xy),
+                _route_length(
+                    ordered, start_xy, distance_fn=distance_fn),
                 tuple(_point_key(point) for point in ordered),
             )
             if best is None or key < best[0]:
@@ -88,13 +91,15 @@ def _best_cycle_order(points, start_xy):
     return best[1]
 
 
-def _best_coverage_suffix(prefix, active_cycle, start_xy):
+def _best_coverage_suffix(
+        prefix, active_cycle, start_xy, distance_fn=None):
     """Append every non-prefix point in the best cycle order exactly once."""
     selected = {_point_key(point) for point in prefix}
     remaining = [
         point for point in active_cycle if _point_key(point) not in selected]
     if not remaining:
-        return list(prefix), _route_length(prefix, start_xy)
+        return list(prefix), _route_length(
+            prefix, start_xy, distance_fn=distance_fn)
 
     best = None
     for direction in (remaining, list(reversed(remaining))):
@@ -102,7 +107,8 @@ def _best_coverage_suffix(prefix, active_cycle, start_xy):
             suffix = direction[offset:] + direction[:offset]
             ordered = list(prefix) + suffix
             key = (
-                _route_length(ordered, start_xy),
+                _route_length(
+                    ordered, start_xy, distance_fn=distance_fn),
                 tuple(_point_key(point) for point in ordered),
             )
             if best is None or key < best[0]:
@@ -137,7 +143,8 @@ def _ranked_combinations(candidates, visit_count):
 
 
 def solve_lrs_priority_route(active_cycle, start_xy, candidate_count=15,
-                             priority_count=6, length_ratio_limit=1.10):
+                             priority_count=6, length_ratio_limit=1.10,
+                             distance_fn=None):
     """Plan a reward-maximal prefix while retaining full cyclic coverage.
 
     Candidate combinations are examined by decreasing reward. Each prefix is
@@ -158,8 +165,9 @@ def solve_lrs_priority_route(active_cycle, start_xy, candidate_count=15,
     if len(set(keys)) != len(keys):
         raise ValueError('active LRS points must have unique stable keys')
 
-    baseline = _best_cycle_order(points, start_xy)
-    baseline_length = _route_length(baseline, start_xy)
+    baseline = _best_cycle_order(points, start_xy, distance_fn)
+    baseline_length = _route_length(
+        baseline, start_xy, distance_fn=distance_fn)
     length_limit = baseline_length * float(length_ratio_limit)
     candidates = _candidate_pool(points, candidate_count)
     mandatory_count = sum(1 for point in candidates if point.mandatory)
@@ -178,12 +186,12 @@ def solve_lrs_priority_route(active_cycle, start_xy, candidate_count=15,
                 break
             evaluated += 1
             solved = solve_held_karp_free_end_path(
-                list(selected_tuple), start_xy)
+                list(selected_tuple), start_xy, distance_fn)
             if solved is None:
                 continue
             prefix, _ = solved
             ordered, length = _best_coverage_suffix(
-                prefix, points, start_xy)
+                prefix, points, start_xy, distance_fn)
             if length > length_limit + 1.0e-9:
                 continue
             feasible += 1
@@ -212,13 +220,13 @@ def solve_lrs_priority_route(active_cycle, start_xy, candidate_count=15,
         baseline_length=baseline_length,
         total_combinations=total_combinations,
         evaluated_routes=evaluated, feasible_routes=feasible,
-        planning_started=started)
+        planning_started=started, distance_fn=distance_fn)
 
 
 def lrs_coverage_fallback(active_cycle, start_xy, baseline=None,
                           baseline_length=None, total_combinations=0,
                           evaluated_routes=0, feasible_routes=0,
-                          planning_started=None):
+                          planning_started=None, distance_fn=None):
     """Return the shortest rotation/orientation of the coverage cycle."""
     points = list(active_cycle)
     if not points:
@@ -226,9 +234,10 @@ def lrs_coverage_fallback(active_cycle, start_xy, baseline=None,
     if planning_started is None:
         planning_started = time.monotonic()
     if baseline is None:
-        baseline = _best_cycle_order(points, start_xy)
+        baseline = _best_cycle_order(points, start_xy, distance_fn)
     if baseline_length is None:
-        baseline_length = _route_length(baseline, start_xy)
+        baseline_length = _route_length(
+            baseline, start_xy, distance_fn=distance_fn)
     return LrsPriorityRoute(
         points=baseline, priority_points=[], reward=0.0,
         length=baseline_length, baseline_length=baseline_length,
@@ -245,7 +254,7 @@ def distance(first, second):
     return math.hypot(first[0] - second[0], first[1] - second[1])
 
 def history_adjusted_cycle(base_points, history_points, replace_radius,
-                           start_xy):
+                           start_xy, distance_fn=None):
     """Replace nearby base points, insert distant points, and rotate a cycle.
 
     Returns ``(ordered_points, replacements, additions)``. Points are ``(x,y)``
@@ -254,6 +263,7 @@ def history_adjusted_cycle(base_points, history_points, replace_radius,
     """
     route = [tuple(point) for point in base_points]
     history = [tuple(point) for point in history_points]
+    distance_fn = distance_fn or distance
     replacements = []
     additions = []
     if not route:
@@ -262,7 +272,7 @@ def history_adjusted_cycle(base_points, history_points, replace_radius,
     replaced_history = set()
     if history:
         distances = np.asarray([
-            [distance(hotspot, base) for base in route]
+            [distance_fn(hotspot, base) for base in route]
             for hotspot in history
         ], dtype=float)
         penalty = 1.0e6
@@ -284,8 +294,9 @@ def history_adjusted_cycle(base_points, history_points, replace_radius,
         for index, first in enumerate(route):
             second = route[(index + 1) % len(route)]
             increase = (
-                distance(first, hotspot) + distance(hotspot, second) -
-                distance(first, second))
+                distance_fn(first, hotspot) +
+                distance_fn(hotspot, second) -
+                distance_fn(first, second))
             key = (increase, index)
             if best is None or key < best[0]:
                 best = (key, index + 1)
@@ -294,7 +305,7 @@ def history_adjusted_cycle(base_points, history_points, replace_radius,
 
     start_index = min(
         range(len(route)),
-        key=lambda index: (distance(route[index], start_xy), index))
+        key=lambda index: (distance_fn(route[index], start_xy), index))
     route = route[start_index:] + route[:start_index]
     return route, replacements, additions
 

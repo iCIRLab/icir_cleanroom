@@ -33,18 +33,20 @@ class LrsManager:
         return first_hazard
 
     @staticmethod
-    def closed_cycle_reference_length(points, start_xy):
+    def closed_cycle_reference_length(
+            points, start_xy, distance_fn=None):
         if not points:
             return 0.0
+        distance_fn = distance_fn or (
+            lambda first, second: math.hypot(
+                float(second[0]) - float(first[0]),
+                float(second[1]) - float(first[1])))
         cycle = 0.0
         for index, first in enumerate(points):
             second = points[(index + 1) % len(points)]
-            cycle += math.hypot(
-                float(second[0]) - float(first[0]),
-                float(second[1]) - float(first[1]))
-        entry = min(math.hypot(
-            float(point[0]) - float(start_xy[0]),
-            float(point[1]) - float(start_xy[1])) for point in points)
+            cycle += distance_fn(first, second)
+        entry = min(
+            distance_fn(tuple(start_xy), point) for point in points)
         return cycle + entry
 
     def prepare_reward_points(

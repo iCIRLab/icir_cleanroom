@@ -3,24 +3,29 @@
 import math
 
 
-def _farthest_cell_index(cells, start_xy):
+def _euclidean(first, second):
+    return math.hypot(first[0] - second[0], first[1] - second[1])
+
+
+def _farthest_cell_index(cells, start_xy, distance_fn):
     return max(
         range(len(cells)),
         key=lambda index: (
-            math.hypot(cells[index].x - start_xy[0],
-                       cells[index].y - start_xy[1]),
+            distance_fn(
+                tuple(start_xy), (cells[index].x, cells[index].y)),
             -cells[index].row, -cells[index].col),
     )
 
 
-def solve_held_karp_open_path(cells, start_xy):
+def solve_held_karp_open_path(cells, start_xy, distance_fn=None):
     """Return the exact open path ending at the farthest selected cell."""
     if not cells:
         return None
-    endpoint = _farthest_cell_index(cells, start_xy)
+    distance_fn = distance_fn or _euclidean
+    endpoint = _farthest_cell_index(cells, start_xy, distance_fn)
     if len(cells) == 1:
-        length = math.hypot(
-            cells[0].x - start_xy[0], cells[0].y - start_xy[1])
+        length = distance_fn(
+            tuple(start_xy), (cells[0].x, cells[0].y))
         return [cells[0]], length
 
     interior = [index for index in range(len(cells)) if index != endpoint]
@@ -30,8 +35,7 @@ def solve_held_karp_open_path(cells, start_xy):
         first_xy = start_xy if first == -1 else (
             cells[first].x, cells[first].y)
         second_xy = (cells[second].x, cells[second].y)
-        return math.hypot(
-            first_xy[0] - second_xy[0], first_xy[1] - second_xy[1])
+        return distance_fn(first_xy, second_xy)
 
     dynamic = {}
     for node in interior:
@@ -76,13 +80,14 @@ def solve_held_karp_open_path(cells, start_xy):
     return [cells[index] for index in ordered_indices], finish[1]
 
 
-def solve_held_karp_free_end_path(cells, start_xy):
+def solve_held_karp_free_end_path(cells, start_xy, distance_fn=None):
     """Return the exact shortest path from ``start_xy`` with a free end."""
+    distance_fn = distance_fn or _euclidean
     if not cells:
         return None
     if len(cells) == 1:
-        length = math.hypot(
-            cells[0].x - start_xy[0], cells[0].y - start_xy[1])
+        length = distance_fn(
+            tuple(start_xy), (cells[0].x, cells[0].y))
         return [cells[0]], length
 
     count = len(cells)
@@ -90,7 +95,7 @@ def solve_held_karp_free_end_path(cells, start_xy):
     dynamic = {}
     for node, cell in enumerate(cells):
         dynamic[(1 << node, node)] = (
-            math.hypot(cell.x - start_xy[0], cell.y - start_xy[1]), -1)
+            distance_fn(tuple(start_xy), (cell.x, cell.y)), -1)
 
     for mask in range(1, full_mask + 1):
         for last in range(count):
@@ -103,9 +108,9 @@ def solve_held_karp_free_end_path(cells, start_xy):
                 state = dynamic.get((previous_mask, previous))
                 if state is None:
                     continue
-                candidate = state[0] + math.hypot(
-                    cells[last].x - cells[previous].x,
-                    cells[last].y - cells[previous].y)
+                candidate = state[0] + distance_fn(
+                    (cells[previous].x, cells[previous].y),
+                    (cells[last].x, cells[last].y))
                 key = (candidate, cells[previous].row, cells[previous].col)
                 if best is None or key < best[0]:
                     best = (key, candidate, previous)

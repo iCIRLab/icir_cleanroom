@@ -66,3 +66,24 @@ def test_lrs_tsp_square_is_a_closed_unit_tour():
     assert result.status == 'OPTIMAL'
     assert math.isclose(result.objective, 4.0)
     assert sorted(result.tour) == [0, 1, 2, 3]
+
+
+def test_lrs_tsp_uses_complete_domain_costs_after_obstacle_filtering():
+    cells = [
+        (0, 0), (0, 1), (0, 2),
+        (1, 0), (1, 1), (1, 2),
+        (2, 0), (2, 2), (3, 0),
+    ]
+    points = [
+        LrsPoint(row, col, float(col), float(row))
+        for row, col in cells]
+    distances = [[
+        math.hypot(first.x - second.x, first.y - second.y)
+        for second in points] for first in points]
+
+    result = solve_lrs_tsp(
+        points, start_xy=(1.0, 1.0), time_limit=5.0,
+        distance_matrix=distances)
+
+    assert result.status == 'OPTIMAL'
+    assert sorted(result.tour) == list(range(len(points)))
