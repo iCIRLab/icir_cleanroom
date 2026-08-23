@@ -246,7 +246,7 @@ class ControllerVisualization:
         marker.id = 0
         marker.type = Marker.POINTS
         marker.action = Marker.ADD
-        marker.scale.x = marker.scale.y = 0.65
+        marker.scale.x = marker.scale.y = 0.28
         marker.color.r = 1.0
         marker.color.g = 0.0
         marker.color.b = 1.0
@@ -263,7 +263,7 @@ class ControllerVisualization:
         peaks.id = 0
         peaks.type = Marker.POINTS
         peaks.action = Marker.ADD
-        peaks.scale.x = peaks.scale.y = 0.72
+        peaks.scale.x = peaks.scale.y = 0.36
         latest_sequence = self.controller.history.confirmed_event_sequence
         events = sorted(
             self.controller.history.confirmed_peak_events.values(),

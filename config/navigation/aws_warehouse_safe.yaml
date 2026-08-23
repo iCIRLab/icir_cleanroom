@@ -35,7 +35,7 @@ local_costmap:
       height: 3
       plugins: ["static_layer", "voxel_layer", "inflation_layer"]
       inflation_layer:
-        inflation_radius: 0.45
+        inflation_radius: 0.30
         cost_scaling_factor: 5.0
 
 global_costmap:
@@ -43,5 +43,5 @@ global_costmap:
     ros__parameters:
       update_frequency: 1.0
       inflation_layer:
-        inflation_radius: 0.45
+        inflation_radius: 0.30
         cost_scaling_factor: 5.0
