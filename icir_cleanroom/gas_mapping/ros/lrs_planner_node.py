@@ -1,4 +1,5 @@
 """ROS adapter that publishes the low-resolution sampling route."""
+import colorsys
 import copy
 
 import numpy as np
@@ -7,9 +8,11 @@ from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
 from ..mapping.grid_geometry import GridGeometry
+from ..mapping.kmeans_partition import partition_sampling_cells
 from ..mapping.lattice import field_cell_lattice, sampling_lattice
 from ..mapping.path_distance import SamplingDistanceOracle
 from ..planning.lrs_tsp import LrsPoint, solve_lrs_tsp
@@ -34,6 +37,8 @@ class LrsPathPlannerNode(Node):
             'robot_start_x': 0.0,   # TSP 경로 계산 시 로봇 출발 x 위치
             'robot_start_y': 0.0,   # TSP 경로 계산 시 로봇 출발 y 위치
             'tsp_time_limit': 60.0, # TSP 최적 경로 계산 제한 시간(초)
+            'lrs_cluster_count': 0, # 0이면 k-means 영역 분할 비활성화
+            'lrs_cluster_random_seed': 0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -43,6 +48,15 @@ class LrsPathPlannerNode(Node):
                 self.lrs_stride_cells <= 0):
             raise ValueError(
                 'lrs_stride_cells must be a positive integer')
+        if (isinstance(self.lrs_cluster_count, bool) or
+                not isinstance(self.lrs_cluster_count, int) or
+                self.lrs_cluster_count < 0):
+            raise ValueError(
+                'lrs_cluster_count must be a non-negative integer')
+        if (isinstance(self.lrs_cluster_random_seed, bool) or
+                not isinstance(self.lrs_cluster_random_seed, int)):
+            raise ValueError(
+                'lrs_cluster_random_seed must be an integer')
 
         self.path_pub = self.create_publisher(
             Path, '/gas_mapping/lrs/route', transient_qos())
@@ -50,6 +64,8 @@ class LrsPathPlannerNode(Node):
             Marker, '/gas_mapping/lrs/status', transient_qos())
         self.points_log_pub = self.create_publisher(
             Marker, '/gas_mapping/lrs/status_log', transient_qos())
+        self.clusters_pub = self.create_publisher(
+            Marker, '/gas_mapping/lrs/clusters', transient_qos())
         self.create_subscription(
             OccupancyGrid, '/gas_mapping/sampling_domain',
             self.sampling_map_callback, transient_qos())
@@ -80,6 +96,15 @@ class LrsPathPlannerNode(Node):
         if (self.planned or self.sampling_map is None or
                 self.navigation_goal_map is None or self.gmrf_map is None):
             return
+        if self.lrs_cluster_count > 0:
+            partition = self.build_partition(
+                self.sampling_map, self.gmrf_map)
+            self.publish_clusters(partition)
+            self.get_logger().info(
+                f'LRS ROI partition complete: '
+                f'clusters={len(partition.centroids)}, '
+                f'cells={len(partition.cells)}, '
+                f'inertia={partition.inertia:.3f}')
         points, nominal_count, distance_oracle = self.build_points(
             self.sampling_map, self.navigation_goal_map, self.gmrf_map)
         if len(points) < 3:
@@ -145,6 +170,14 @@ class LrsPathPlannerNode(Node):
         return points, len(nominal), SamplingDistanceOracle(
             sampling_geometry, traversal_mask)
 
+    def build_partition(self, sampling_map, gmrf_map):
+        sampling_geometry, sampling_mask = self.domain_mask(
+            sampling_map, 'sampling domain')
+        gmrf_geometry = GridGeometry.from_message(gmrf_map)
+        return partition_sampling_cells(
+            gmrf_geometry, sampling_geometry, sampling_mask,
+            self.lrs_cluster_count, self.lrs_cluster_random_seed)
+
     def publish_route(self, ordered):
         msg = Path()
         msg.header.frame_id = 'map'
@@ -174,6 +207,31 @@ class LrsPathPlannerNode(Node):
         log_marker = copy.deepcopy(marker)
         log_marker.ns = 'gas_mapping_lrs_status_log'
         self.points_log_pub.publish(log_marker)
+
+    def publish_clusters(self, partition):
+        marker = Marker()
+        marker.header.frame_id = 'map'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'gas_mapping_lrs_clusters'
+        marker.id = 0
+        marker.type = Marker.CUBE_LIST
+        marker.action = Marker.ADD
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = marker.scale.y = 0.9 * float(
+            self.gmrf_map.info.resolution)
+        marker.scale.z = 0.04
+        marker.points = [
+            Point(x=cell.x, y=cell.y, z=0.02)
+            for cell in partition.cells]
+        palette = []
+        for cluster_id in range(len(partition.centroids)):
+            red, green, blue = colorsys.hsv_to_rgb(
+                (0.61803398875 * cluster_id) % 1.0, 0.72, 1.0)
+            palette.append(ColorRGBA(
+                r=red, g=green, b=blue, a=0.25))
+        marker.colors = [
+            palette[cell.cluster_id] for cell in partition.cells]
+        self.clusters_pub.publish(marker)
 
 
 def main(args=None):

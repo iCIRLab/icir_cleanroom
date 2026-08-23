@@ -22,6 +22,7 @@ topics:
   lrs_planner:
     publishers:
       /gas_mapping/lrs/route: nav_msgs/msg/Path
+      /gas_mapping/lrs/clusters: visualization_msgs/msg/Marker
       /gas_mapping/lrs/status: visualization_msgs/msg/Marker
       /gas_mapping/lrs/status_log: visualization_msgs/msg/Marker
   controller:

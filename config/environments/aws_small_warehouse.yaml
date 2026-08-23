@@ -33,6 +33,8 @@ gas_environment:
   log_concentration_min: -4.0
 
 lrs:
+  lrs_cluster_count: 10
+  lrs_cluster_random_seed: 0
   lrs_stride_cells: 10
   lrs_min_x: -6.0
   lrs_max_x: 6.0

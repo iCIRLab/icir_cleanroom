@@ -8,6 +8,10 @@ from builtin_interfaces.msg import Time
 from visualization_msgs.msg import Marker
 
 from icir_cleanroom.gas_mapping.config import DEFAULT_CONTROLLER_PARAMETERS
+from icir_cleanroom.gas_mapping.mapping.kmeans_partition import (
+    ClusterCell, KMeansPartition)
+from icir_cleanroom.gas_mapping.ros.lrs_planner_node import (
+    LrsPathPlannerNode)
 from icir_cleanroom.gas_mapping.ros.publishers import (
     ControllerVisualization, MappingPublishers, PUBLISHER_SPECS)
 
@@ -73,3 +77,31 @@ def test_hrs_marker_keeps_each_point_aligned_with_one_color():
     assert captured.message.colors[1].r == 0.0
     assert captured.message.colors[1].g == 0.0
     assert captured.message.colors[1].b == 0.0
+
+
+def test_lrs_cluster_marker_uses_gmrf_cell_scale_and_cluster_colors():
+    captured = CapturePublisher()
+    clock = SimpleNamespace(now=lambda: SimpleNamespace(
+        to_msg=lambda: Time()))
+    planner = object.__new__(LrsPathPlannerNode)
+    planner.clusters_pub = captured
+    planner.gmrf_map = SimpleNamespace(
+        info=SimpleNamespace(resolution=0.5))
+    planner.get_clock = lambda: clock
+    partition = KMeansPartition(
+        cells=(
+            ClusterCell(0, 0, 0.0, 0.0, 0),
+            ClusterCell(0, 1, 0.5, 0.0, 0),
+            ClusterCell(1, 0, 0.0, 0.5, 1)),
+        centroids=((0.25, 0.0), (0.0, 0.5)), inertia=0.125)
+
+    planner.publish_clusters(partition)
+
+    assert captured.message.type == Marker.CUBE_LIST
+    assert captured.message.scale.x == 0.45
+    assert captured.message.scale.y == 0.45
+    assert captured.message.pose.orientation.w == 1.0
+    assert len(captured.message.points) == 3
+    assert len(captured.message.colors) == 3
+    assert captured.message.colors[0] == captured.message.colors[1]
+    assert captured.message.colors[0] != captured.message.colors[2]

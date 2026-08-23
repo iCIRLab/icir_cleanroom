@@ -84,6 +84,10 @@ Visualization Manager:
       Enabled: false
       Name: LRSHistoryReward
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/reward}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: LRSClusters
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/clusters}
     - Class: rviz_default_plugins/Path
       Enabled: true
       Name: LRSTSPRoute
@@ -109,7 +113,7 @@ Visualization Manager:
       Pose Style: None
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/priority_route}
     - Class: rviz_default_plugins/Marker
-      Enabled: true
+      Enabled: false
       Name: LRSPriorityCandidates
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/priority_candidates}
     - Alpha: 0.58

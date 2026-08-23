@@ -16,6 +16,8 @@ from icir_cleanroom.gas_mapping.mapping.domains import (
     field_geometry, navigation_goal_mask, sampling_mask)
 from icir_cleanroom.gas_mapping.mapping.gmrf import GmrfGrid
 from icir_cleanroom.gas_mapping.mapping.grid_geometry import GridGeometry
+from icir_cleanroom.gas_mapping.mapping.kmeans_partition import (
+    partition_sampling_cells)
 from icir_cleanroom.gas_mapping.mapping.lattice import (
     field_cell_lattice, sampling_lattice)
 from icir_cleanroom.gas_mapping.mapping.path_distance import (
@@ -276,6 +278,36 @@ def test_aws_navigation_goal_domain_keeps_six_safe_lrs_points(
     assert [(point.x, point.y) for point in points] == [
         (-6.0, -9.0), (-6.0, -4.0), (-1.0, -4.0),
         (4.0, -4.0), (-6.0, 1.0), (-6.0, 6.0)]
+
+
+def test_aws_sampling_domain_uses_configured_cluster_count(
+        map_message_factory):
+    profile = yaml.safe_load((
+        PACKAGE_ROOT / 'config' / 'environments' /
+        'aws_small_warehouse.yaml').read_text(encoding='utf-8'))
+    environment, navigation_map = load_environment_map(
+        'aws_small_warehouse', map_message_factory)
+    traversal = sampling_mask(
+        navigation_map, environment['sampling_clearance'],
+        environment['robot_start_x'], environment['robot_start_y'])
+    gmrf = field_geometry(
+        environment['map_min_x'], environment['map_max_x'],
+        environment['map_min_y'], environment['map_max_y'],
+        environment['gmrf_resolution'])
+    navigation_geometry = GridGeometry.from_message(navigation_map)
+
+    result = partition_sampling_cells(
+        gmrf, navigation_geometry, traversal,
+        cluster_count=profile['lrs']['lrs_cluster_count'],
+        random_seed=profile['lrs']['lrs_cluster_random_seed'])
+
+    assert (gmrf.width, gmrf.height, gmrf.resolution) == (29, 41, 0.5)
+    assert len(result.centroids) == profile['lrs']['lrs_cluster_count']
+    assert sorted({cell.cluster_id for cell in result.cells}) == list(
+        range(profile['lrs']['lrs_cluster_count']))
+    for cell in result.cells:
+        row, col = navigation_geometry.world_to_cell(cell.x, cell.y)
+        assert traversal[row, col]
 
 
 def test_empty_navigation_goal_domain_preserves_36_lrs_points(

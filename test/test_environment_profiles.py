@@ -46,6 +46,14 @@ def test_environment_profiles_select_the_expected_navigation_profile():
             'config/navigation/aws_warehouse_safe.yaml')
 
 
+def test_warehouse_enables_reproducible_cluster_partition():
+    lrs = load_profile('aws_small_warehouse')['lrs']
+
+    assert lrs['lrs_cluster_count'] == 10
+    assert lrs['lrs_cluster_random_seed'] == 0
+    assert 'lrs_cluster_count' not in load_profile('empty_50m')['lrs']
+
+
 def test_aws_world_model_dependencies_and_provenance_are_complete():
     world_path = (
         PACKAGE_ROOT / 'worlds' / 'aws_small_warehouse' /
