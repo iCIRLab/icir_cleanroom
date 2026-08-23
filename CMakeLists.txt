@@ -29,6 +29,8 @@ ament_python_install_package(icir_cleanroom)
 install(DIRECTORY
     launch
     worlds
+    maps
+    models
     urdf
     rviz
     DESTINATION share/${PROJECT_NAME}
