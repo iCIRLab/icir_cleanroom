@@ -50,6 +50,8 @@ namespace gazebo
             double total_detected_concentration;
             double detector_radius;
             double sigma;
+            double update_period;
+            double last_update_time;
     };
 }
 

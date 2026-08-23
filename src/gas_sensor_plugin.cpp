@@ -7,7 +7,9 @@ namespace gazebo
 {
 
 GasSensorPlugin::GasSensorPlugin()
-: total_detected_concentration(0.0)
+: total_detected_concentration(0.0),
+  update_period(1.0 / 20.0),
+  last_update_time(0.0)
 {}
 
 void GasSensorPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
@@ -27,6 +29,17 @@ void GasSensorPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
         this->sigma = _sdf->Get<double>("sigma");
     else
         this->sigma = 1.5;
+
+    double update_rate = 20.0;
+    if (_sdf->HasElement("update_rate"))
+        update_rate = _sdf->Get<double>("update_rate");
+    if (!std::isfinite(update_rate) || update_rate <= 0.0) {
+        gzerr << "[GasSensorPlugin] update_rate는 양수여야 합니다: "
+              << update_rate << std::endl;
+        return;
+    }
+    this->update_period = 1.0 / update_rate;
+    this->last_update_time = this->model->GetWorld()->SimTime().Double();
 
     std::string sensor_link_name = "gas_sensor_link";
     if (_sdf->HasElement("sensor_link_name"))
@@ -106,6 +119,18 @@ double GasSensorPlugin::CalculateDetectedConcentration(double distance, double s
 
 void GasSensorPlugin::OnUpdate()
 {
+    physics::WorldPtr world = this->model->GetWorld();
+    if (!world) return;
+
+    double current_time = world->SimTime().Double();
+    if (current_time < this->last_update_time) {
+        this->last_update_time = current_time;
+    }
+    if (current_time - this->last_update_time < this->update_period) {
+        return;
+    }
+    this->last_update_time = current_time;
+
     rclcpp::spin_some(this->ros_node);
     this->FindAndSubscribeToSources();
 

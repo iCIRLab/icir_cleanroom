@@ -586,6 +586,7 @@
       <sensor_link_name>gas_sensor_link</sensor_link_name>
       <detector_radius>0.015</detector_radius>
       <sigma>1.5</sigma>
+      <update_rate>20.0</update_rate>
     </plugin>
   </model>
 </sdf>
