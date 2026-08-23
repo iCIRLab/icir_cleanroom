@@ -30,7 +30,7 @@ gas_mapping_controller_node:
     hrs_update_seconds: 50.0
     hrs_combination_time_limit: 5.0
     hrs_planner_mode: reward_ordered_exact
-    hazard_threshold: 0.2
+    hazard_threshold: 0.15
     history_top_k: 3
     history_merge_radius: 5.0
     lrs_history_replace_radius: 5.0
