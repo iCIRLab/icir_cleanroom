@@ -80,10 +80,13 @@ def test_source_state_round_trip_and_seeded_generation(tmp_path):
     save_source_state(path, state)
     assert load_source_state(path) == state
 
+    sampling_points = [
+        (float(x), float(y))
+        for y in range(-5, 6) for x in range(-5, 6)]
     first = generate_random_source_state(
         random.Random(7), -5, 5, -5, 5, 1.0,
-        1.0, 2.0, 0.0, 2.0, 0.1)
+        1.0, 2.0, 0.0, 0.1, sampling_points)
     second = generate_random_source_state(
         random.Random(7), -5, 5, -5, 5, 1.0,
-        1.0, 2.0, 0.0, 2.0, 0.1)
+        1.0, 2.0, 0.0, 0.1, sampling_points)
     assert first == second

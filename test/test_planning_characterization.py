@@ -6,7 +6,7 @@ from icir_cleanroom.gas_mapping.planning.hrs import (
     HrsCell, solve_held_karp_free_end_path, solve_held_karp_open_path,
     solve_hrs_p2)
 from icir_cleanroom.gas_mapping.planning.lrs_priority import (
-    LrsRewardPoint, solve_lrs_priority_route)
+    LrsRewardPoint, history_adjusted_cycle, solve_lrs_priority_route)
 from icir_cleanroom.gas_mapping.planning.lrs_tsp import LrsPoint, solve_lrs_tsp
 
 
@@ -55,6 +55,22 @@ def test_lrs_priority_preserves_complete_coverage():
     assert len(result.points) == 4
     assert {point.variable for point in result.points} == {0, 1, 2, 3}
     assert 2 in {point.variable for point in result.priority_points}
+
+
+def test_history_adjustment_replaces_near_points_adds_far_points_and_keeps_base():
+    base = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)]
+    original_base = list(base)
+    nearby = (1.0, 0.0)
+    distant = (4.0, 5.0)
+
+    adjusted, replacements, additions = history_adjusted_cycle(
+        base, [nearby, distant], replace_radius=2.0,
+        start_xy=(0.0, 0.0))
+
+    assert base == original_base
+    assert replacements == [((0.0, 0.0), nearby, 1.0)]
+    assert additions == [distant]
+    assert set(adjusted) == {nearby, distant, (10.0, 0.0), (10.0, 10.0)}
 
 
 def test_lrs_tsp_square_is_a_closed_unit_tour():

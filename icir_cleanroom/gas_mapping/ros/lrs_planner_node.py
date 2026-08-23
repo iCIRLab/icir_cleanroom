@@ -12,8 +12,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
 from ..mapping.grid_geometry import GridGeometry
-from ..mapping.kmeans_partition import partition_sampling_cells
-from ..mapping.lattice import field_cell_lattice, sampling_lattice
+from ..mapping.lrs_representatives import build_lrs_representatives
 from ..mapping.path_distance import SamplingDistanceOracle
 from ..planning.lrs_tsp import LrsPoint, solve_lrs_tsp
 
@@ -29,30 +28,20 @@ class LrsPathPlannerNode(Node):
     def __init__(self):
         super().__init__('lrs_path_planner_node')
         defaults = {
-            'lrs_stride_cells': 10, # LRS 지점 사이의 GMRF 셀 수(alpha)
-            'lrs_min_x': 0.0,       # 격자 생성 범위 x축 최소(m)
-            'lrs_max_x': 50.0,      # 격자 생성 범위 x축 최대(m)
-            'lrs_min_y': 0.0,       # 격자 생성 범위 y축 최소(m)
-            'lrs_max_y': 50.0,      # 격자 생성 범위 y축 최대(m)
             'robot_start_x': 0.0,   # TSP 경로 계산 시 로봇 출발 x 위치
             'robot_start_y': 0.0,   # TSP 경로 계산 시 로봇 출발 y 위치
             'tsp_time_limit': 60.0, # TSP 최적 경로 계산 제한 시간(초)
-            'lrs_cluster_count': 0, # 0이면 k-means 영역 분할 비활성화
+            'lrs_cluster_count': 36,
             'lrs_cluster_random_seed': 0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
             setattr(self, name, self.get_parameter(name).value)
-        if (isinstance(self.lrs_stride_cells, bool) or
-                not isinstance(self.lrs_stride_cells, int) or
-                self.lrs_stride_cells <= 0):
-            raise ValueError(
-                'lrs_stride_cells must be a positive integer')
         if (isinstance(self.lrs_cluster_count, bool) or
                 not isinstance(self.lrs_cluster_count, int) or
-                self.lrs_cluster_count < 0):
+                self.lrs_cluster_count <= 0):
             raise ValueError(
-                'lrs_cluster_count must be a non-negative integer')
+                'lrs_cluster_count must be a positive integer')
         if (isinstance(self.lrs_cluster_random_seed, bool) or
                 not isinstance(self.lrs_cluster_random_seed, int)):
             raise ValueError(
@@ -96,40 +85,39 @@ class LrsPathPlannerNode(Node):
         if (self.planned or self.sampling_map is None or
                 self.navigation_goal_map is None or self.gmrf_map is None):
             return
-        if self.lrs_cluster_count > 0:
-            partition = self.build_partition(
-                self.sampling_map, self.gmrf_map)
-            self.publish_clusters(partition)
-            self.get_logger().info(
-                f'LRS ROI partition complete: '
-                f'clusters={len(partition.centroids)}, '
-                f'cells={len(partition.cells)}, '
-                f'inertia={partition.inertia:.3f}')
-        points, nominal_count, distance_oracle = self.build_points(
+        selection, points, distance_oracle = self.build_points(
             self.sampling_map, self.navigation_goal_map, self.gmrf_map)
+        self.publish_clusters(selection.partition)
+        if selection.omitted_cluster_ids:
+            self.get_logger().warning(
+                'Navigation goal이 없는 LRS 클러스터를 제외합니다: '
+                f'{list(selection.omitted_cluster_ids)}')
         if len(points) < 3:
             raise RuntimeError(
-                'LRS requires at least 3 navigation goal points, '
-                f'found {len(points)}')
+                'LRS requires at least 3 safe cluster representatives, '
+                f'found {len(points)} from k={self.lrs_cluster_count}')
 
-        solver_arguments = {}
-        if len(points) != nominal_count:
-            solver_arguments['distance_matrix'] = distance_oracle.matrix(
-                points)
-            solver_arguments['start_distances'] = [
-                distance_oracle.distance(
-                    (self.robot_start_x, self.robot_start_y),
-                    (point.x, point.y))
-                for point in points]
+        distance_matrix = distance_oracle.matrix(points)
+        start_distances = [
+            distance_oracle.distance(
+                (self.robot_start_x, self.robot_start_y),
+                (point.x, point.y))
+            for point in points]
         result = solve_lrs_tsp(
             points, (self.robot_start_x, self.robot_start_y),
-            self.tsp_time_limit, **solver_arguments)
+            self.tsp_time_limit, distance_matrix=distance_matrix,
+            start_distances=start_distances)
         ordered = [points[index] for index in result.tour]
         self.publish_route(ordered)
         self.publish_points(ordered)
         self.planned = True
         self.get_logger().info(
-            f'LRS P1 complete: points={len(points)}, status={result.status}, '
+            f'LRS P1 complete: k={self.lrs_cluster_count}, '
+            f'cluster_cells={len(selection.partition.cells)}, '
+            f'points={len(points)}, '
+            f'omitted={list(selection.omitted_cluster_ids)}, '
+            f'inertia={selection.partition.inertia:.3f}, '
+            f'status={result.status}, '
             f'objective={result.objective:.3f}m, gap={result.gap:.6f}, '
             f'cuts={result.cuts}')
 
@@ -156,27 +144,14 @@ class LrsPathPlannerNode(Node):
             raise ValueError(
                 'navigation goal domain must be a sampling domain subset')
         gmrf_geometry = GridGeometry.from_message(gmrf_map)
-        nominal = field_cell_lattice(
-            gmrf_geometry,
-            self.lrs_min_x, self.lrs_max_x,
-            self.lrs_min_y, self.lrs_max_y, self.lrs_stride_cells)
-        accessible = sampling_lattice(
-            gmrf_geometry, goal_geometry, goal_mask,
-            self.lrs_min_x, self.lrs_max_x,
-            self.lrs_min_y, self.lrs_max_y, self.lrs_stride_cells)
-        points = [LrsPoint(
-            point.lattice_row, point.lattice_col, point.x, point.y)
-            for point in accessible]
-        return points, len(nominal), SamplingDistanceOracle(
-            sampling_geometry, traversal_mask)
-
-    def build_partition(self, sampling_map, gmrf_map):
-        sampling_geometry, sampling_mask = self.domain_mask(
-            sampling_map, 'sampling domain')
-        gmrf_geometry = GridGeometry.from_message(gmrf_map)
-        return partition_sampling_cells(
-            gmrf_geometry, sampling_geometry, sampling_mask,
+        selection = build_lrs_representatives(
+            gmrf_geometry, sampling_geometry, traversal_mask, goal_mask,
             self.lrs_cluster_count, self.lrs_cluster_random_seed)
+        points = [LrsPoint(
+            point.field_row, point.field_col, point.x, point.y)
+            for point in selection.representatives]
+        return selection, points, SamplingDistanceOracle(
+            sampling_geometry, traversal_mask)
 
     def publish_route(self, ordered):
         msg = Path()

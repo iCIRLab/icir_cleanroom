@@ -15,6 +15,7 @@ def load_profile(name):
 
 
 def test_environment_profiles_resolve_assets_and_aligned_field_grid():
+    cluster_counts = {'empty_50m': 36, 'aws_small_warehouse': 10}
     for name in ('empty_50m', 'aws_small_warehouse'):
         profile = load_profile(name)
         environment = profile['environment']
@@ -26,9 +27,8 @@ def test_environment_profiles_resolve_assets_and_aligned_field_grid():
         assert (map_yaml.parent / map_config['image']).is_file()
 
         gas = profile['gas_environment']
-        assert profile['lrs']['lrs_stride_cells'] == 10
-        assert 'lrs_spacing' not in profile['lrs']
-        assert 'source_random_lrs_spacing' not in gas
+        assert profile['lrs']['lrs_cluster_count'] == cluster_counts[name]
+        assert profile['lrs']['lrs_cluster_random_seed'] == 0
         for resolution_name in (
                 'ground_truth_resolution', 'gmrf_resolution'):
             resolution = gas[resolution_name]
@@ -51,7 +51,9 @@ def test_warehouse_enables_reproducible_cluster_partition():
 
     assert lrs['lrs_cluster_count'] == 10
     assert lrs['lrs_cluster_random_seed'] == 0
-    assert 'lrs_cluster_count' not in load_profile('empty_50m')['lrs']
+    empty_lrs = load_profile('empty_50m')['lrs']
+    assert empty_lrs['lrs_cluster_count'] == 36
+    assert empty_lrs['lrs_cluster_random_seed'] == 0
 
 
 def test_aws_world_model_dependencies_and_provenance_are_complete():

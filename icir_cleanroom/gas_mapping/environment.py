@@ -5,8 +5,6 @@ import math
 import os
 import tempfile
 
-from .mapping.lattice import inclusive_axis
-
 SOURCE_PARAMETER_NAMES = (
     'source_enabled', 'source_x', 'source_y',
     'source_strength', 'source_sigma',
@@ -26,6 +24,23 @@ SOURCE_MODES = (
     'manual', 'random_after_peak', 'recurrent_hotspots_after_peak')
 AUTOMATIC_SOURCE_MODES = SOURCE_MODES[1:]
 RANDOM_SOURCE_MAX_ATTEMPTS = 1000
+
+
+def inclusive_axis(minimum, maximum, spacing):
+    """Return grid-center coordinates including both configured bounds."""
+    minimum = float(minimum)
+    maximum = float(maximum)
+    spacing = float(spacing)
+    if not all(math.isfinite(value) for value in (
+            minimum, maximum, spacing)):
+        raise ValueError('source grid bounds and spacing must be finite')
+    if maximum < minimum:
+        raise ValueError(
+            'source grid maximum must not be less than minimum')
+    if spacing <= 0.0:
+        raise ValueError('source grid spacing must be positive')
+    count = int(math.floor((maximum - minimum) / spacing + 1.0e-9))
+    return [minimum + index * spacing for index in range(count + 1)]
 
 
 def validated_source_state(state, min_x, max_x, min_y, max_y):
@@ -133,15 +148,8 @@ def validated_hotspot_source_config(
 
 
 def random_source_is_lrs_detectable(
-        state, min_x, max_x, min_y, max_y, lrs_spacing,
-        detection_threshold, sampling_points=None):
-    points = sampling_points
-    if points is None:
-        points = [
-            (x, y)
-            for y in inclusive_axis(min_y, max_y, lrs_spacing)
-            for x in inclusive_axis(min_x, max_x, lrs_spacing)]
-    for x, y in points:
+        state, detection_threshold, sampling_points):
+    for x, y in sampling_points:
         distance_sq = (
             (x - state['source_x']) ** 2
             + (y - state['source_y']) ** 2)
@@ -154,9 +162,9 @@ def random_source_is_lrs_detectable(
 
 def generate_random_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
-        sigma_min, sigma_max, min_separation, lrs_spacing,
-        detection_threshold, previous_position=None,
-        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, sampling_points=None):
+        sigma_min, sigma_max, min_separation, detection_threshold,
+        sampling_points, previous_position=None,
+        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
     x_centers = inclusive_axis(min_x, max_x, gmrf_resolution)
     y_centers = inclusive_axis(min_y, max_y, gmrf_resolution)
     min_separation_sq = min_separation ** 2
@@ -174,8 +182,7 @@ def generate_random_source_state(
             if dx * dx + dy * dy < min_separation_sq:
                 continue
         if random_source_is_lrs_detectable(
-                proposed, min_x, max_x, min_y, max_y, lrs_spacing,
-                detection_threshold, sampling_points):
+                proposed, detection_threshold, sampling_points):
             return proposed
     raise ValueError(
         f'could not generate a detectable random gas source in '
@@ -194,9 +201,9 @@ def snap_to_grid(value, minimum, resolution):
 
 def generate_recurrent_hotspot_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
-        sigma_min, sigma_max, lrs_spacing, detection_threshold,
+        sigma_min, sigma_max, detection_threshold,
         hotspot_centers, hotspot_weights, hotspot_jitter_sigma,
-        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, sampling_points=None):
+        sampling_points, max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
     hotspots = [
         (hotspot_centers[index], hotspot_centers[index + 1])
         for index in range(0, len(hotspot_centers), 2)]
@@ -220,8 +227,7 @@ def generate_recurrent_hotspot_source_state(
                 and min_y <= proposed['source_y'] <= max_y):
             continue
         if random_source_is_lrs_detectable(
-                proposed, min_x, max_x, min_y, max_y, lrs_spacing,
-                detection_threshold, sampling_points):
+                proposed, detection_threshold, sampling_points):
             return proposed
     raise ValueError(
         f'could not generate a detectable recurrent-hotspot gas source in '

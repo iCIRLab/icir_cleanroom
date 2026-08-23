@@ -18,8 +18,8 @@ from icir_cleanroom.gas_mapping.mapping.gmrf import GmrfGrid
 from icir_cleanroom.gas_mapping.mapping.grid_geometry import GridGeometry
 from icir_cleanroom.gas_mapping.mapping.kmeans_partition import (
     partition_sampling_cells)
-from icir_cleanroom.gas_mapping.mapping.lattice import (
-    field_cell_lattice, sampling_lattice)
+from icir_cleanroom.gas_mapping.mapping.lrs_representatives import (
+    build_lrs_representatives)
 from icir_cleanroom.gas_mapping.mapping.path_distance import (
     SamplingDistanceOracle)
 from icir_cleanroom.gas_mapping.ros.lrs_planner_node import (
@@ -68,61 +68,6 @@ def test_field_bounds_are_first_and_last_cell_centers():
     assert (warehouse.width, warehouse.height) == (29, 41)
     assert warehouse.cell_center(0, 0) == (-7.0, -10.0)
     assert warehouse.cell_center(40, 28) == (7.0, 10.0)
-
-
-def test_aws_lrs_lattice_is_aligned_to_half_meter_field_centers():
-    field = field_geometry(-7.0, 7.0, -10.0, 10.0, 0.5)
-    sampling = GridGeometry(280, 420, 0.05, -7.0, -10.5)
-    mask = np.ones((sampling.height, sampling.width), dtype=bool)
-
-    points = sampling_lattice(
-        field, sampling, mask,
-        -6.0, 6.0, -9.0, 9.0, 10)
-
-    assert sorted({point.x for point in points}) == [-6.0, -1.0, 4.0]
-    assert sorted({point.y for point in points}) == [-9.0, -4.0, 1.0, 6.0]
-    assert len(points) == 12
-    for point in points:
-        assert (point.x, point.y) == field.cell_center(
-            point.field_row, point.field_col)
-
-
-def test_empty_lattice_preserves_36_center_aligned_nodes():
-    field = field_geometry(0.0, 50.0, 0.0, 50.0, 1.0)
-    sampling = GridGeometry(1100, 1100, 0.05, -2.5, -2.5)
-    mask = np.ones((sampling.height, sampling.width), dtype=bool)
-
-    points = sampling_lattice(
-        field, sampling, mask,
-        0.0, 50.0, 0.0, 50.0, 10)
-
-    assert len(points) == 36
-    assert sorted({point.x for point in points}) == [
-        0.0, 10.0, 20.0, 30.0, 40.0, 50.0]
-    assert sorted({point.y for point in points}) == [
-        0.0, 10.0, 20.0, 30.0, 40.0, 50.0]
-
-
-def test_aligned_lattice_excludes_centers_outside_sampling_domain():
-    field = field_geometry(0.0, 1.0, 0.0, 0.0, 1.0)
-    sampling = GridGeometry(2, 1, 1.0, -0.5, -0.5)
-    mask = np.asarray([[True, False]])
-
-    points = sampling_lattice(
-        field, sampling, mask,
-        0.0, 1.0, 0.0, 0.0, 1)
-
-    assert [(point.x, point.y) for point in points] == [(0.0, 0.0)]
-
-
-def test_lrs_bounds_must_be_exact_field_cell_centers():
-    field = field_geometry(-1.0, 1.0, -1.0, 1.0, 0.5)
-
-    with np.testing.assert_raises_regex(ValueError, 'cell center'):
-        field_cell_lattice(field, -0.9, 1.0, -1.0, 1.0, 2)
-
-    with pytest.raises(ValueError, match='integer'):
-        field_cell_lattice(field, -1.0, 1.0, -1.0, 1.0, 2.0)
 
 
 def test_field_bounds_require_whole_resolution_steps():
@@ -226,15 +171,14 @@ def test_lrs_uses_goal_domain_for_stops_and_sampling_domain_for_distance(
         data=[0, 100, 0, 100, 0], width=5, height=1)
     gmrf = map_message_factory(width=5, height=1)
     planner = object.__new__(LrsPathPlannerNode)
-    planner.lrs_min_x = planner.lrs_min_y = 0.5
-    planner.lrs_max_x = 4.5
-    planner.lrs_max_y = 0.5
-    planner.lrs_stride_cells = 1
+    planner.lrs_cluster_count = 3
+    planner.lrs_cluster_random_seed = 0
 
-    points, nominal_count, oracle = planner.build_points(
+    selection, points, oracle = planner.build_points(
         sampling, goals, gmrf)
 
-    assert nominal_count == 5
+    assert len(selection.partition.centroids) == 3
+    assert not selection.omitted_cluster_ids
     assert [(point.x, point.y) for point in points] == [
         (0.5, 0.5), (2.5, 0.5), (4.5, 0.5)]
     assert math.isclose(oracle.distance((0.5, 0.5), (4.5, 0.5)), 4.0)
@@ -247,37 +191,43 @@ def test_lrs_rejects_goal_cells_outside_sampling_domain(
     goals = map_message_factory(width=3, height=1)
     gmrf = map_message_factory(width=3, height=1)
     planner = object.__new__(LrsPathPlannerNode)
-    planner.lrs_min_x = planner.lrs_min_y = 0.5
-    planner.lrs_max_x = 2.5
-    planner.lrs_max_y = 0.5
-    planner.lrs_stride_cells = 1
+    planner.lrs_cluster_count = 3
+    planner.lrs_cluster_random_seed = 0
 
     with pytest.raises(ValueError, match='must be a sampling domain subset'):
         planner.build_points(sampling, goals, gmrf)
 
 
-def test_aws_navigation_goal_domain_keeps_six_safe_lrs_points(
+def test_aws_navigation_goal_domain_keeps_ten_safe_representatives(
         map_message_factory):
+    profile = yaml.safe_load((
+        PACKAGE_ROOT / 'config' / 'environments' /
+        'aws_small_warehouse.yaml').read_text(encoding='utf-8'))
     environment, navigation_map = load_environment_map(
         'aws_small_warehouse', map_message_factory)
     traversal = sampling_mask(
         navigation_map, environment['sampling_clearance'],
         environment['robot_start_x'], environment['robot_start_y'])
     goals = navigation_goal_mask(
-        navigation_map, traversal, inflation_radius=0.55)
+        navigation_map, traversal, inflation_radius=0.45)
     gmrf = field_geometry(
         environment['map_min_x'], environment['map_max_x'],
         environment['map_min_y'], environment['map_max_y'],
         environment['gmrf_resolution'])
     navigation_geometry = GridGeometry.from_message(navigation_map)
+    lrs = profile['lrs']
 
-    points = sampling_lattice(
-        gmrf, navigation_geometry, goals,
-        -6.0, 6.0, -9.0, 9.0, 10)
+    selection = build_lrs_representatives(
+        gmrf, navigation_geometry, traversal, goals,
+        lrs['lrs_cluster_count'], lrs['lrs_cluster_random_seed'])
 
-    assert [(point.x, point.y) for point in points] == [
-        (-6.0, -9.0), (-6.0, -4.0), (-1.0, -4.0),
-        (4.0, -4.0), (-6.0, 1.0), (-6.0, 6.0)]
+    assert len(selection.representatives) == 10
+    assert not selection.omitted_cluster_ids
+    for representative in selection.representatives:
+        row, col = navigation_geometry.world_to_cell(
+            representative.x, representative.y)
+        assert traversal[row, col]
+        assert goals[row, col]
 
 
 def test_aws_sampling_domain_uses_configured_cluster_count(
@@ -312,6 +262,9 @@ def test_aws_sampling_domain_uses_configured_cluster_count(
 
 def test_empty_navigation_goal_domain_preserves_36_lrs_points(
         map_message_factory):
+    profile = yaml.safe_load((
+        PACKAGE_ROOT / 'config' / 'environments' /
+        'empty_50m.yaml').read_text(encoding='utf-8'))
     environment, navigation_map = load_environment_map(
         'empty_50m', map_message_factory)
     traversal = sampling_mask(
@@ -324,13 +277,13 @@ def test_empty_navigation_goal_domain_preserves_36_lrs_points(
         environment['map_min_y'], environment['map_max_y'],
         environment['gmrf_resolution'])
 
-    points = sampling_lattice(
-        gmrf, GridGeometry.from_message(navigation_map), goals,
-        0.0, 50.0, 0.0, 50.0, 10)
+    lrs = profile['lrs']
+    selection = build_lrs_representatives(
+        gmrf, GridGeometry.from_message(navigation_map), traversal, goals,
+        lrs['lrs_cluster_count'], lrs['lrs_cluster_random_seed'])
 
-    assert len(points) == 36
-    assert (points[0].x, points[0].y) == (0.0, 0.0)
-    assert (points[-1].x, points[-1].y) == (50.0, 50.0)
+    assert len(selection.representatives) == 36
+    assert not selection.omitted_cluster_ids
 
 
 def test_hrs_candidates_are_restricted_without_removing_field_variables(
@@ -349,8 +302,6 @@ def test_source_detectability_uses_accessible_sampling_points_only():
     source = {
         'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0}
     assert not random_source_is_lrs_detectable(
-        source, 0.0, 10.0, 0.0, 10.0, 5.0, 0.2,
-        sampling_points=[(0.0, 0.0)])
+        source, 0.2, sampling_points=[(0.0, 0.0)])
     assert random_source_is_lrs_detectable(
-        source, 0.0, 10.0, 0.0, 10.0, 5.0, 0.2,
-        sampling_points=[(4.0, 5.0)])
+        source, 0.2, sampling_points=[(4.0, 5.0)])

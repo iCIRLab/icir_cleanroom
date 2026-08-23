@@ -105,8 +105,7 @@ def launch_setup(context):
             f'Invalid Nav2 inflation configuration: {error}') from error
     lrs_parameters = dict(profile['lrs'])
     required_lrs_parameters = (
-        'lrs_stride_cells', 'lrs_min_x', 'lrs_max_x',
-        'lrs_min_y', 'lrs_max_y')
+        'lrs_cluster_count', 'lrs_cluster_random_seed')
     missing_lrs_parameters = [
         name for name in required_lrs_parameters
         if name not in lrs_parameters]
@@ -116,11 +115,9 @@ def launch_setup(context):
             f'{", ".join(missing_lrs_parameters)}')
     lrs_parameters['use_sim_time'] = use_sim_time
     gas_parameters.update({
-        'source_detection_min_x': lrs_parameters['lrs_min_x'],
-        'source_detection_max_x': lrs_parameters['lrs_max_x'],
-        'source_detection_min_y': lrs_parameters['lrs_min_y'],
-        'source_detection_max_y': lrs_parameters['lrs_max_y'],
-        'lrs_stride_cells': lrs_parameters['lrs_stride_cells'],
+        'lrs_cluster_count': lrs_parameters['lrs_cluster_count'],
+        'lrs_cluster_random_seed':
+            lrs_parameters['lrs_cluster_random_seed'],
     })
     controller_parameters = dict(mapping_params)
     controller_parameters['use_sim_time'] = use_sim_time

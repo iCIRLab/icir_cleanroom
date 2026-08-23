@@ -26,7 +26,8 @@ from ..environment import (
 from ..mapping.domains import (
     field_geometry, navigation_goal_mask, sampling_mask)
 from ..mapping.grid_geometry import GridGeometry
-from ..mapping.lattice import sampling_lattice
+from ..mapping.lrs_representatives import build_lrs_representatives
+
 
 def transient_qos():
     qos = QoSProfile(depth=1)
@@ -47,11 +48,8 @@ class GasEnvironmentNode(Node):
             'source_random_sigma_min': 4.0,
             'source_random_sigma_max': 7.0,
             'source_random_min_separation': 10.0,
-            'lrs_stride_cells': 10,
-            'source_detection_min_x': 0.0,
-            'source_detection_max_x': 50.0,
-            'source_detection_min_y': 0.0,
-            'source_detection_max_y': 50.0,
+            'lrs_cluster_count': 36,
+            'lrs_cluster_random_seed': 0,
             'source_random_detection_threshold': 0.2,
             'source_hotspot_centers': [
                 10.0, 10.0,
@@ -81,28 +79,26 @@ class GasEnvironmentNode(Node):
             self.ground_truth_resolution, self.gmrf_resolution,
             self.sampling_clearance, self.navigation_goal_clearance,
             self.robot_start_x, self.robot_start_y,
-            self.source_detection_min_x, self.source_detection_max_x,
-            self.source_detection_min_y, self.source_detection_max_y,
             self.log_concentration_min)
         if not all(math.isfinite(float(value))
                    for value in map_config_values):
             raise ValueError('map and grid numeric parameters must be finite')
         if min(self.ground_truth_resolution, self.gmrf_resolution) <= 0.0:
             raise ValueError('grid resolutions must be positive')
-        if (isinstance(self.lrs_stride_cells, bool) or
-                not isinstance(self.lrs_stride_cells, int) or
-                self.lrs_stride_cells <= 0):
+        if (isinstance(self.lrs_cluster_count, bool) or
+                not isinstance(self.lrs_cluster_count, int) or
+                self.lrs_cluster_count <= 0):
             raise ValueError(
-                'lrs_stride_cells must be a positive integer')
+                'lrs_cluster_count must be a positive integer')
+        if (isinstance(self.lrs_cluster_random_seed, bool) or
+                not isinstance(self.lrs_cluster_random_seed, int)):
+            raise ValueError(
+                'lrs_cluster_random_seed must be an integer')
         if self.sampling_clearance < 0.0:
             raise ValueError('sampling_clearance must be non-negative')
         if self.navigation_goal_clearance <= 0.0:
             raise ValueError(
                 'navigation_goal_clearance must be positive')
-        if (self.source_detection_max_x < self.source_detection_min_x or
-                self.source_detection_max_y < self.source_detection_min_y):
-            raise ValueError(
-                'source detection maximums must not be less than minimums')
         if (self.map_max_x < self.map_min_x
                 or self.map_max_y < self.map_min_y):
             raise ValueError('map maximums must not be less than minimums')
@@ -243,7 +239,6 @@ class GasEnvironmentNode(Node):
             f'sigma={self.source_sigma:.3f}')
 
     def generate_random_source(self, previous_position):
-        lrs_spacing = self.gmrf_resolution * self.lrs_stride_cells
         if self.source_mode == 'recurrent_hotspots_after_peak':
             return generate_recurrent_hotspot_source_state(
                 self.source_rng,
@@ -252,12 +247,11 @@ class GasEnvironmentNode(Node):
                 self.gmrf_resolution,
                 self.source_random_sigma_min,
                 self.source_random_sigma_max,
-                lrs_spacing,
                 self.source_random_detection_threshold,
                 self.source_hotspot_centers,
                 self.source_hotspot_weights,
                 self.source_hotspot_jitter_sigma,
-                sampling_points=self.source_detection_points)
+                self.source_detection_points)
         return generate_random_source_state(
             self.source_rng,
             self.map_min_x, self.map_max_x,
@@ -266,10 +260,10 @@ class GasEnvironmentNode(Node):
             self.source_random_sigma_min,
             self.source_random_sigma_max,
             self.source_random_min_separation,
-            lrs_spacing,
             self.source_random_detection_threshold,
+            self.source_detection_points,
             previous_position=previous_position,
-            sampling_points=self.source_detection_points)
+        )
 
     def advance_source_callback(self, request, response):
         del request
@@ -392,18 +386,21 @@ class GasEnvironmentNode(Node):
             self.gmrf_resolution,
             self.map_min_x, self.map_min_y,
             self.map_max_x, self.map_max_y)
-        aligned_points = sampling_lattice(
+        selection = build_lrs_representatives(
             GridGeometry.from_message(gmrf_map), sampling_geometry,
-            navigation_goals,
-            self.source_detection_min_x, self.source_detection_max_x,
-            self.source_detection_min_y, self.source_detection_max_y,
-            self.lrs_stride_cells)
+            accessible, navigation_goals,
+            self.lrs_cluster_count, self.lrs_cluster_random_seed)
         self.source_detection_points = [
-            (point.x, point.y) for point in aligned_points]
+            (point.x, point.y) for point in selection.representatives]
+        if selection.omitted_cluster_ids:
+            self.get_logger().warning(
+                'Navigation goal이 없는 source-detection 클러스터를 '
+                f'제외합니다: {list(selection.omitted_cluster_ids)}')
         if len(self.source_detection_points) < 3:
             raise RuntimeError(
-                'Navigation goal domain requires at least 3 LRS points, '
-                f'found {len(self.source_detection_points)}')
+                'Source detection requires at least 3 safe cluster '
+                f'representatives, found {len(self.source_detection_points)} '
+                f'from k={self.lrs_cluster_count}')
         if not self.source_ready:
             self.initialize_random_source()
             self.source_ready = True
