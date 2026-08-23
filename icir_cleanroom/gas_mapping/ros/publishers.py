@@ -296,11 +296,11 @@ class ControllerVisualization:
         marker.header.stamp = self.controller.get_clock().now().to_msg()
         marker.ns = 'gas_mapping_lrs_status'
         marker.id = 0
-        marker.type = Marker.POINTS
+        marker.type = Marker.SPHERE_LIST
         marker.action = Marker.ADD
-        marker.scale.x = marker.scale.y = 0.18
+        marker.scale.x = marker.scale.y = marker.scale.z = 0.30
         marker.points = [
-            Point(x=goal.pose.position.x, y=goal.pose.position.y, z=0.08)
+            Point(x=goal.pose.position.x, y=goal.pose.position.y, z=0.15)
             for goal in self.controller.lrs_goals]
         marker.colors = [self.controller.value_color(value)
                          for value in self.controller.lrs_status_values]

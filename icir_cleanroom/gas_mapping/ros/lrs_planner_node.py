@@ -164,12 +164,12 @@ class LrsPathPlannerNode(Node):
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = 'gas_mapping_lrs_status'
         marker.id = 0
-        marker.type = Marker.POINTS
+        marker.type = Marker.SPHERE_LIST
         marker.action = Marker.ADD
-        marker.scale.x = marker.scale.y = 0.18
+        marker.scale.x = marker.scale.y = marker.scale.z = 0.30
         marker.color.r = marker.color.g = marker.color.b = 0.55
         marker.color.a = 1.0
-        marker.points = [Point(x=p.x, y=p.y, z=0.08) for p in ordered]
+        marker.points = [Point(x=p.x, y=p.y, z=0.15) for p in ordered]
         self.points_pub.publish(marker)
         log_marker = copy.deepcopy(marker)
         log_marker.ns = 'gas_mapping_lrs_status_log'

@@ -143,11 +143,11 @@ Visualization Manager:
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/confirmed_peaks}
     - Class: rviz_default_plugins/Marker
       Enabled: false
-      Name: SamplingStatus
+      Name: LRSStatus
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/status}
     - Class: rviz_default_plugins/Marker
       Enabled: true
-      Name: SamplingStatusLog
+      Name: LRSStatusLog
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/lrs/status_log}
     - Class: rviz_default_plugins/Path
       Enabled: true
