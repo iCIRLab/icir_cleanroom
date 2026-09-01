@@ -5,7 +5,8 @@ environment:
   robot_spawn: {x: 0.0, y: 0.0, z: 0.01, yaw: 0.0}
 
 gas_environment:
-  source_mode: recurrent_hotspots_after_peak
+  # 사용 가능 모드: manual, random_after_peak, recurrent_hotspots_after_peak
+  source_mode: random_after_peak
   source_enabled: false
   source_x: 0.0
   source_y: 0.0

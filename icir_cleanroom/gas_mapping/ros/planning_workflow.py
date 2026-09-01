@@ -42,7 +42,8 @@ class PlanningWorkflow:
         if outcome.error is not None:
             self.controller.get_logger().error(
                 f'HRS P2 worker failed: {outcome.error!r}')
-            self.controller.start_peak_confirmation('P2 worker failure')
+            self.controller.return_to_lrs(
+                'HRS response threshold not reached: P2 worker failure')
             return
         plan, attempts = outcome.result
         for visit_count, result in attempts:
@@ -50,7 +51,8 @@ class PlanningWorkflow:
                 self.controller.get_logger().warning(
                     f'HRS P2 T={visit_count}: feasible route 없음')
         if plan is None:
-            self.controller.start_peak_confirmation('no feasible P2 route')
+            self.controller.return_to_lrs(
+                'HRS response threshold not reached: no feasible P2 route')
             return
         self.controller.active_hrs_route = plan
         self.controller.current_index = 0

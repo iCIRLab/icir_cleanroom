@@ -12,14 +12,14 @@ from visualization_msgs.msg import Marker
 
 from ..mapping.field_projection import (
     logarithmic_display as transform_logarithmic_display, project_field)
-from ..planning.hrs_policy import normalized_ucb
+from ..planning.hrs_policy import distance_discounted_ucb
 
 
 PUBLISHER_SPECS = (
     ('estimate_pub', OccupancyGrid, '/gas_mapping/estimate'),
     ('estimate_log_pub', OccupancyGrid, '/gas_mapping/estimate_log'),
     ('variance_pub', OccupancyGrid, '/gas_mapping/variance'),
-    ('reward_pub', OccupancyGrid, '/gas_mapping/reward'),
+    ('dd_ucb_pub', OccupancyGrid, '/gas_mapping/hrs/dd_ucb'),
     ('poses_pub', PoseArray, '/gas_mapping/measurements/poses'),
     ('values_pub', Float32MultiArray, '/gas_mapping/measurements/values'),
     ('lrs_status_pub', Marker, '/gas_mapping/lrs/status'),
@@ -35,8 +35,8 @@ PUBLISHER_SPECS = (
      '/gas_mapping/history/concentration_log'),
     ('history_recent_log_map_pub', OccupancyGrid,
      '/gas_mapping/history/recent_log'),
-    ('history_confirmed_peaks_pub', Marker,
-     '/gas_mapping/history/confirmed_peaks'),
+    ('history_confirmed_events_pub', Marker,
+     '/gas_mapping/history/confirmed_events'),
     ('history_revisit_pub', Marker, '/gas_mapping/history/revisit'),
     ('lrs_lap_pub', Int32, '/gas_mapping/lrs/lap'),
     ('hazard_pub', Bool, '/gas_mapping/hazard_state'),
@@ -87,7 +87,8 @@ class ControllerVisualization:
 
     METHODS = (
         'clear_hrs_candidates', 'display_field', 'occupancy_grid',
-        'publish_maps', 'logarithmic_display', 'publish_measurements',
+        'publish_maps', 'publish_dd_ucb', 'logarithmic_display',
+        'publish_measurements',
         'publish_lrs_active_route', 'publish_lrs_reward',
         'publish_lrs_priority_candidates', 'publish_lrs_priority_route',
         'publish_history', 'publish_empty_hrs_route', 'value_color',
@@ -134,12 +135,30 @@ class ControllerVisualization:
             self.controller.gmrf.variance)
         self.controller.variance_pub.publish(self.controller.occupancy_grid(
             variance_template, variance, variance_free))
-        reward = normalized_ucb(
+        self.publish_dd_ucb()
+
+    def publish_dd_ucb(self, current_xy=None):
+        if self.controller.gmrf is None:
+            return
+        if current_xy is None:
+            if self.controller.latest_pose is None:
+                return
+            current_xy = (
+                self.controller.latest_pose.pose.position.x,
+                self.controller.latest_pose.pose.position.y)
+        distances = np.asarray([
+            math.hypot(x - float(current_xy[0]), y - float(current_xy[1]))
+            for x, y in (
+                self.controller.gmrf.cell_center(variable)
+                for variable in range(len(self.controller.gmrf.var_cells)))
+        ], dtype=float)
+        dd_ucb = distance_discounted_ucb(
             self.controller.gmrf.solution, self.controller.gmrf.variance,
-            float(self.controller.hrs_ucb_k))
-        reward_template, reward_values, reward_free = self.controller.display_field(reward)
-        self.controller.reward_pub.publish(self.controller.occupancy_grid(
-            reward_template, reward_values, reward_free))
+            distances, float(self.controller.hrs_ucb_k),
+            float(self.controller.hrs_distance_weight))
+        template, values, free = self.controller.display_field(dd_ucb)
+        self.controller.dd_ucb_pub.publish(
+            self.controller.occupancy_grid(template, values, free))
 
     def logarithmic_display(self, values):
         return transform_logarithmic_display(
@@ -256,29 +275,29 @@ class ControllerVisualization:
             for record in self.controller.active_history_regions]
         self.controller.history_revisit_pub.publish(marker)
 
-        peaks = Marker()
-        peaks.header.frame_id = 'map'
-        peaks.header.stamp = self.controller.get_clock().now().to_msg()
-        peaks.ns = 'gas_mapping_history_confirmed_peaks'
-        peaks.id = 0
-        peaks.type = Marker.POINTS
-        peaks.action = Marker.ADD
-        peaks.scale.x = peaks.scale.y = 0.36
+        confirmed = Marker()
+        confirmed.header.frame_id = 'map'
+        confirmed.header.stamp = self.controller.get_clock().now().to_msg()
+        confirmed.ns = 'gas_mapping_history_confirmed_events'
+        confirmed.id = 0
+        confirmed.type = Marker.POINTS
+        confirmed.action = Marker.ADD
+        confirmed.scale.x = confirmed.scale.y = 0.36
         latest_sequence = self.controller.history.confirmed_event_sequence
         events = sorted(
-            self.controller.history.confirmed_peak_events.values(),
+            self.controller.history.confirmed_events.values(),
             key=lambda event: (
                 int(event['sequence']), str(event['event_id'])))
         for event in events:
             x, y = self.controller.history.cell_center(event['row'], event['col'])
-            peaks.points.append(Point(x=x, y=y, z=0.24))
+            confirmed.points.append(Point(x=x, y=y, z=0.24))
             if int(event['sequence']) == latest_sequence:
-                peaks.colors.append(ColorRGBA(
+                confirmed.colors.append(ColorRGBA(
                     r=0.0, g=1.0, b=0.55, a=1.0))
             else:
-                peaks.colors.append(ColorRGBA(
+                confirmed.colors.append(ColorRGBA(
                     r=1.0, g=0.35, b=0.0, a=0.9))
-        self.controller.history_confirmed_peaks_pub.publish(peaks)
+        self.controller.history_confirmed_events_pub.publish(confirmed)
 
     def publish_empty_hrs_route(self):
         path = Path()

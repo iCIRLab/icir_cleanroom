@@ -30,7 +30,7 @@ topics:
       - /gas_mapping/estimate
       - /gas_mapping/estimate_log
       - /gas_mapping/variance
-      - /gas_mapping/reward
+      - /gas_mapping/hrs/dd_ucb
       - /gas_mapping/measurements/poses
       - /gas_mapping/measurements/values
       - /gas_mapping/lrs/status
@@ -42,7 +42,7 @@ topics:
       - /gas_mapping/history/concentration
       - /gas_mapping/history/concentration_log
       - /gas_mapping/history/recent_log
-      - /gas_mapping/history/confirmed_peaks
+      - /gas_mapping/history/confirmed_events
       - /gas_mapping/history/revisit
       - /gas_mapping/lrs/lap
       - /gas_mapping/hazard_state

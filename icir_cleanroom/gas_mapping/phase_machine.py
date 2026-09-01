@@ -15,14 +15,10 @@ ALLOWED_TRANSITIONS = {
         MappingPhase.HRS_PLANNING, MappingPhase.COMPLETE},
     MappingPhase.HRS_PLANNING: {
         MappingPhase.HRS_PLANNING, MappingPhase.HRS_NAVIGATION,
-        MappingPhase.HRS_PEAK_CONFIRMATION, MappingPhase.LRS_PLANNING,
+        MappingPhase.LRS_PLANNING,
         MappingPhase.COMPLETE},
     MappingPhase.HRS_NAVIGATION: {
         MappingPhase.HRS_NAVIGATION, MappingPhase.HRS_PLANNING,
-        MappingPhase.HRS_PEAK_CONFIRMATION, MappingPhase.LRS_PLANNING,
-        MappingPhase.COMPLETE},
-    MappingPhase.HRS_PEAK_CONFIRMATION: {
-        MappingPhase.HRS_PEAK_CONFIRMATION,
         MappingPhase.SOURCE_TRANSITION, MappingPhase.LRS_PLANNING,
         MappingPhase.COMPLETE},
     MappingPhase.SOURCE_TRANSITION: {

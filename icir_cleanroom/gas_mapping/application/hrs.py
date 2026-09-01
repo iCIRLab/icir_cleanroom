@@ -1,8 +1,9 @@
 """HRS runtime-state owner, candidate policy, and exact planning facade."""
+import math
 
 from ..models import HrsRuntimeState
 from ..planning.hrs import HrsCell, solve_hrs_p2
-from ..planning.hrs_policy import normalized_ucb, peak_search_status
+from ..planning.hrs_policy import distance_discounted_ucb
 
 
 class HrsManager:
@@ -37,21 +38,55 @@ class HrsManager:
 
     def build_candidates(
             self, gmrf, sampled_variables, ucb_coefficient, count,
-            eligible_variables=None):
-        potentials = normalized_ucb(
-            gmrf.solution, gmrf.variance, float(ucb_coefficient))
+            eligible_variables=None, current_xy=None, distance_weight=0.0):
+        distance_weight = float(distance_weight)
+        if not math.isfinite(distance_weight) or distance_weight < 0.0:
+            raise ValueError(
+                'distance_weight must be finite and non-negative')
+
+        if distance_weight > 0.0 and current_xy is None:
+            raise ValueError(
+                'current_xy is required when distance_weight is positive')
+
+        if current_xy is not None:
+            current_x, current_y = (
+                float(current_xy[0]), float(current_xy[1]))
+            if not math.isfinite(current_x) or not math.isfinite(current_y):
+                raise ValueError('current_xy must contain finite coordinates')
+        else:
+            current_x = current_y = 0.0
+
+        distances = []
+        for variable in range(len(gmrf.var_cells)):
+            x, y = gmrf.cell_center(variable)
+            distances.append(
+                math.hypot(x - current_x, y - current_y)
+                if current_xy is not None else 0.0)
+        potentials = distance_discounted_ucb(
+            gmrf.solution, gmrf.variance, distances,
+            float(ucb_coefficient), distance_weight)
+
         candidates = []
         for variable in self.available_variables(
                 len(gmrf.var_cells), sampled_variables,
                 eligible_variables):
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
+
+            reward = float(potentials[variable])
+
             candidates.append(HrsCell(
-                variable=variable, row=int(row), col=int(col), x=x, y=y,
-                reward=float(potentials[variable]),
+                variable=variable,
+                row=int(row),
+                col=int(col),
+                x=x,
+                y=y,
+                reward=reward,
                 mean=float(gmrf.solution[variable]),
                 variance=float(gmrf.variance[variable])))
-        candidates.sort(key=lambda cell: (-cell.reward, cell.row, cell.col))
+
+        candidates.sort(
+            key=lambda cell: (-cell.reward, cell.row, cell.col))
         return candidates[:int(count)]
 
     @staticmethod
@@ -74,21 +109,14 @@ class HrsManager:
         return None, attempts
 
     @staticmethod
-    def stop_decision(cycles, converged, minimum_cycles, maximum_cycles):
-        if int(cycles) >= int(minimum_cycles) and bool(converged):
-            return 'converged'
-        if int(cycles) >= int(maximum_cycles):
-            return 'max_cycles'
-        return None
-
-    def evaluate_stop(
-            self, gmrf, sampled_variables, best_observed,
-            ucb_coefficient, margin, eligible_variables=None):
-        available = self.available_variables(
-            len(gmrf.var_cells), sampled_variables, eligible_variables)
-        return peak_search_status(
-            gmrf.solution, gmrf.variance, available, best_observed,
-            ucb_coefficient, margin)
+    def reached_response_threshold(value, threshold):
+        value = float(value)
+        threshold = float(threshold)
+        if not math.isfinite(value):
+            raise ValueError('measured value must be finite')
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError('response threshold must be in [0, 1]')
+        return value >= threshold
 
 
 __all__ = ['HrsManager']

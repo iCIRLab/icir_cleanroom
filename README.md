@@ -20,6 +20,16 @@ ros2 launch icir_cleanroom cleanroom_empty.launch.py
 이 launch는 Gazebo와 TurtleBot3, Nav2, 가스 지도 생성기, LRS 경로 계획기,
 LRS/HRS 매핑 컨트롤러 및 RViz를 시작합니다.
 
+## 히스토리맵 초기화
+
+실행 중인 시뮬레이션을 종료한 뒤 저장된 히스토리맵을 삭제합니다.
+
+```bash
+rm -f ~/.ros/icir_cleanroom/gas_history.json
+```
+
+다음 실행은 빈 히스토리맵으로 시작합니다.
+
 ## 전체 프로젝트 구조
 
 세 `scripts/*.py` 파일은 기존 `ros2 run` 실행 이름을 보존하는 얇은
@@ -45,7 +55,7 @@ icir_cleanroom/
 │   │   ├── lrs_planner_node.py         # 기본 LRS route 발행
 │   │   ├── nav2_client.py              # Nav2 action 통신
 │   │   ├── publishers.py               # 지도·경로·Marker 시각화
-│   │   └── *_workflow.py               # Navigation/LRS/HRS/peak 흐름 연결
+│   │   └── *_workflow.py               # Navigation/LRS/HRS 흐름 연결
 │   ├── application/                    # 작업 흐름과 runtime state 관리
 │   │   ├── orchestrator.py             # 전체 LRS/HRS 흐름 조정
 │   │   ├── navigation.py               # 이동 상태와 재시도
@@ -53,7 +63,6 @@ icir_cleanroom/
 │   │   ├── planning_executor.py        # 비동기 planning 작업
 │   │   ├── lrs.py                      # LRS 회차 상태
 │   │   ├── hrs.py                      # HRS 후보·실패·종료 상태
-│   │   └── peak_confirmation.py        # 최고 농도 셀 검증
 │   ├── mapping/
 │   │   ├── gmrf.py                     # GMRF, GaBP, CG
 │   │   ├── gmrf_service.py             # 계산 재시도와 rollback
@@ -63,7 +72,7 @@ icir_cleanroom/
 │   │   ├── lrs_tsp.py                  # 기본 LRS 순회 경로
 │   │   ├── lrs_priority.py             # History 기반 LRS 우선 경로
 │   │   ├── hrs.py                      # HRS 경로 최적화
-│   │   └── hrs_policy.py               # UCB와 HRS 종료 정책
+│   │   └── hrs_policy.py               # UCB와 거리 감점 정책
 │   └── history/
 │       ├── model.py                     # 측정 이력·지역·보상 계산
 │       └── repository.py                # History JSON 저장·복원
@@ -79,7 +88,7 @@ icir_cleanroom/
 ```
 
 `mapping`, `planning`, `history`의 계산 모듈은 ROS node를 import하지 않습니다.
-Controller의 공개 토픽 23개, 파라미터 46개, 서비스와 Nav2 action 이름은
+Controller의 공개 토픽 23개, 파라미터 44개, 서비스와 Nav2 action 이름은
 리팩터링 전과 동일합니다.
 
 ## 실제 실행 흐름
@@ -111,13 +120,15 @@ sequenceDiagram
     Map->>Ctrl: 측정 농도 발행
     Ctrl->>App: 측정 결과 전달
     App->>GMRF: observation 추가 및 지도 갱신
-    GMRF-->>App: 추정 농도·분산·UCB 반환
+    GMRF-->>App: 추정 농도·분산 반환
+    App->>App: DD-UCB 후보 점수 계산
     Ctrl->>RViz: 지도·경로·Marker 발행
 
     App->>App: 위험 감지 시 HRS 전환
     App->>Nav2: HRS 후보 셀 이동
     Nav2-->>App: 이동 결과 반환
-    App->>App: 최고 농도 셀 확인
+    App->>App: dwell 평균과 대응 임계값 비교
+    App->>App: 미달 시 DD-UCB 반복, 이상 시 검출 이벤트 확정
 ```
 
 실선은 요청·명령·데이터 전달을, 점선은 처리 결과·응답 반환을 나타냅니다.
@@ -131,6 +142,6 @@ colcon test --packages-select icir_cleanroom
 colcon test-result --verbose
 ```
 
-테스트는 GMRF GaBP/CG 결과와 rollback, UCB/HRS stop, LRS/HRS 경로,
+테스트는 GMRF GaBP/CG 결과와 rollback, DD-UCB/HRS 임계값, LRS/HRS 경로,
 history/source JSON 호환성, phase 및 async generation, RViz point/color 대응,
 ROS 인터페이스 manifest를 고정합니다.

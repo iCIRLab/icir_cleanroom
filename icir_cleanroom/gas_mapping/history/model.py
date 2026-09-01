@@ -8,7 +8,8 @@ import numpy as np
 
 
 class GasHistory:
-    VERSION = 3
+    VERSION = 4
+    CONFIRMATION_METHODS = ('peak_confirmation', 'threshold_crossing')
 
     def __init__(self, map_msg, hazard_threshold, recent_alpha=0.5):
         self.width = int(map_msg.info.width)
@@ -28,7 +29,7 @@ class GasHistory:
         self.history_recent = np.zeros(
             (self.height, self.width), dtype=float)
         self.history_count = 0
-        self.confirmed_peak_events = {}
+        self.confirmed_events = {}
         self.confirmed_event_sequence = 0
 
     @staticmethod
@@ -132,8 +133,10 @@ class GasHistory:
         self.history_count = next_count
         return self.history_count
 
-    def record_confirmed_peak(self, event_id, row, col, value, timestamp):
-        """Record exactly one confirmed peak for an independent gas event.
+    def record_confirmed_event(
+            self, event_id, row, col, value, response_threshold, timestamp,
+            method='threshold_crossing'):
+        """Record exactly one confirmed detection for an independent event.
 
         Returns ``True`` for a newly inserted event and ``False`` when the
         event id was already present. Duplicate calls never increment the
@@ -142,28 +145,43 @@ class GasHistory:
         event_id = str(event_id)
         if not event_id:
             raise ValueError('event_id must not be empty')
-        if event_id in self.confirmed_peak_events:
+        if event_id in self.confirmed_events:
             return False
         row, col = self._validate_cell(row, col, require_free=True)
         value = self._clamped_value(value)
+        method = str(method)
+        if method not in self.CONFIRMATION_METHODS:
+            raise ValueError(
+                f'confirmation method must be one of '
+                f'{self.CONFIRMATION_METHODS}')
+        if response_threshold is None:
+            if method == 'threshold_crossing':
+                raise ValueError(
+                    'threshold crossing requires a response threshold')
+            threshold = None
+        else:
+            threshold = self._clamped_value(
+                response_threshold, 'response_threshold')
         timestamp = self._finite_timestamp(timestamp)
         self.confirmed_event_sequence += 1
-        self.confirmed_peak_events[event_id] = {
+        self.confirmed_events[event_id] = {
             'event_id': event_id,
             'sequence': self.confirmed_event_sequence,
             'row': row,
             'col': col,
             'value': value,
+            'response_threshold': threshold,
             'timestamp': timestamp,
+            'method': method,
         }
         return True
 
-    def latest_confirmed_peak(self):
-        """Return the newest confirmed peak, or ``None`` when none exists."""
-        if not self.confirmed_peak_events:
+    def latest_confirmed_event(self):
+        """Return the newest confirmed event, or ``None`` when none exists."""
+        if not self.confirmed_events:
             return None
         event = max(
-            self.confirmed_peak_events.values(),
+            self.confirmed_events.values(),
             key=lambda item: (
                 int(item['sequence']), str(item['event_id'])))
         result = dict(event)
@@ -184,7 +202,7 @@ class GasHistory:
 
         Event age is measured in confirmed gas events, not wall-clock time.
         A Gaussian spatial kernel lets nearby LRS waypoints benefit from a
-        confirmed peak without treating unvisited/background cells as
+        confirmed event without treating unvisited/background cells as
         negative observations.
         """
         cells = self._validate_cells(cells)
@@ -194,7 +212,7 @@ class GasHistory:
             raise ValueError('event_half_life must be positive')
         if not math.isfinite(kernel_sigma) or kernel_sigma <= 0.0:
             raise ValueError('kernel_sigma must be positive')
-        if len(cells) == 0 or not self.confirmed_peak_events:
+        if len(cells) == 0 or not self.confirmed_events:
             return np.zeros(len(cells), dtype=float)
         if (np.any(cells[:, 0] < 0) or np.any(cells[:, 0] >= self.height) or
                 np.any(cells[:, 1] < 0) or
@@ -207,7 +225,7 @@ class GasHistory:
             cells[:, 0].astype(float) + 0.5) * self.resolution
         mass = np.zeros(len(cells), dtype=float)
         denominator = 2.0 * kernel_sigma * kernel_sigma
-        for event in self.confirmed_peak_events.values():
+        for event in self.confirmed_events.values():
             event_x, event_y = self.cell_center(
                 event['row'], event['col'])
             age = max(
@@ -229,9 +247,9 @@ class GasHistory:
                           event_half_life=10.0):
         """Group confirmed events into distinct, deterministic regions.
 
-        The result contains a representative peak for each connected group,
+        The result contains a representative event for each connected group,
         recurrence score, event count, and ``is_latest`` so the controller can
-        reserve the latest confirmed peak independently from older Top-K
+        reserve the latest confirmed event independently from older Top-K
         regions.
         """
         merge_radius = float(merge_radius)
@@ -241,7 +259,7 @@ class GasHistory:
         if not math.isfinite(event_half_life) or event_half_life <= 0.0:
             raise ValueError('event_half_life must be positive')
         events = sorted(
-            self.confirmed_peak_events.values(),
+            self.confirmed_events.values(),
             key=lambda item: (int(item['sequence']), str(item['event_id'])))
         if not events:
             return []
@@ -294,7 +312,7 @@ class GasHistory:
                 'row': row, 'col': col, 'x': x, 'y': y,
                 'event_count': len(members),
                 'recurrence_mass': float(recurrence),
-                'peak_value': max(float(item['value']) for item in members),
+                'max_value': max(float(item['value']) for item in members),
                 'latest_value': float(representative['value']),
                 'last_confirmed': max(
                     float(item['timestamp']) for item in members),
@@ -304,7 +322,7 @@ class GasHistory:
         regions.sort(key=lambda item: (
             not bool(item['is_latest']),
             -float(item['recurrence_mass']),
-            -float(item['peak_value']),
+            -float(item['max_value']),
             -float(item['last_confirmed']),
             int(item['row']), int(item['col'])))
         if top_k is None:
@@ -317,7 +335,7 @@ class GasHistory:
                               staleness_horizon=None):
         """Return normalized LRS reward evidence for ``(row, col)`` cells.
 
-        ``recurrence`` comes only from independently confirmed peaks;
+        ``recurrence`` comes only from independently confirmed events;
         ``severity`` is the recent event-level GMRF EMA; ``staleness`` and
         ``uncertainty`` come only from actual LRS visits. Consequently an
         unobserved background-prior estimate is never counted as evidence that
@@ -516,6 +534,5 @@ class GasHistory:
         self.history_mean.fill(0.0)
         self.history_recent.fill(0.0)
         self.history_count = 0
-        self.confirmed_peak_events.clear()
+        self.confirmed_events.clear()
         self.confirmed_event_sequence = 0
-

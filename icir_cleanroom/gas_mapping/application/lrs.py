@@ -53,7 +53,7 @@ class LrsManager:
             self, adjusted_points, gmrf, history, lrs_config,
             history_config, now=None):
         """Build the unique active set and all history-aware rewards."""
-        latest = history.latest_confirmed_peak()
+        latest = history.latest_confirmed_event()
         mandatory_variable = None
         if latest is not None:
             mandatory_variable = gmrf.variable_at(

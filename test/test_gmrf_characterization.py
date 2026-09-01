@@ -4,7 +4,7 @@ import numpy as np
 
 from icir_cleanroom.gas_mapping.mapping.gmrf import GmrfGrid
 from icir_cleanroom.gas_mapping.planning.hrs_policy import (
-    normalized_ucb, peak_search_status)
+    distance_discounted_ucb, normalized_ucb)
 
 
 def test_observation_replaces_nearest_cell_and_reset_restores_prior(
@@ -48,17 +48,18 @@ def test_gabp_matches_locked_cg_solution(map_message_factory):
     ], atol=1.0e-9)
 
 
-def test_normalized_ucb_and_stop_margin_are_preserved():
+def test_normalized_ucb_is_preserved():
     np.testing.assert_allclose(
         normalized_ucb([0.1, 0.8], [0.04, 0.01], 1.5),
         [0.4, 0.95])
-    stopped, variable, maximum, gap = peak_search_status(
-        [0.1, 0.8], [0.04, 0.01], {0, 1}, 0.95,
-        coefficient=1.0, margin=0.02)
-    assert stopped is True
-    assert variable == 1
-    assert maximum == 0.9
-    assert np.isclose(gap, -0.05)
+
+
+def test_distance_discounted_ucb_matches_hrs_candidate_score():
+    np.testing.assert_allclose(
+        distance_discounted_ucb(
+            [0.5, 0.6], [0.0, 0.0], [0.0, 2.0],
+            coefficient=0.0, distance_weight=0.5),
+        [0.5, 0.3])
 
 
 def test_gmrf_variable_and_directed_message_order(map_message_factory):

@@ -2,9 +2,9 @@
 
 import math
 
-from icir_cleanroom.gas_mapping.planning.hrs import (
-    HrsCell, solve_held_karp_free_end_path, solve_held_karp_open_path,
-    solve_hrs_p2)
+from icir_cleanroom.gas_mapping.planning.exact_path import (
+    solve_held_karp_free_end_path, solve_held_karp_open_path)
+from icir_cleanroom.gas_mapping.planning.hrs import HrsCell, solve_hrs_p2
 from icir_cleanroom.gas_mapping.planning.lrs_priority import (
     LrsRewardPoint, history_adjusted_cycle, solve_lrs_priority_route)
 from icir_cleanroom.gas_mapping.planning.lrs_tsp import LrsPoint, solve_lrs_tsp
@@ -40,6 +40,18 @@ def test_hrs_reward_ordered_exact_selects_best_feasible_set():
     assert result.solver == 'HELD_KARP'
     assert math.isclose(result.reward, 1.7)
     assert {cell.variable for cell in result.cells} == {0, 1}
+
+
+def test_hrs_reward_ordered_exact_supports_a_single_cell_route():
+    candidate = hrs_cell(7, 2, 3, 0.8)
+
+    result = solve_hrs_p2(
+        [candidate], (0.0, 0.0), visit_count=1, speed=5.0,
+        update_seconds=50.0, dwell_seconds=2.0)
+
+    assert result.visit_count == 1
+    assert [cell.variable for cell in result.cells] == [7]
+    assert math.isclose(result.reward, 0.8)
 
 
 def test_lrs_priority_preserves_complete_coverage():
