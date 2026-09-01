@@ -298,6 +298,20 @@ def test_hrs_candidates_are_restricted_without_removing_field_variables(
     assert len(gmrf.var_cells) == 3
 
 
+def test_hrs_candidates_prefer_nearer_cells_when_ucb_is_tied(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=3, height=1))
+    gmrf.solution[:] = [0.5, 0.5, 0.5]
+    gmrf.variance[:] = [0.0, 0.0, 0.0]
+    manager = HrsManager()
+    candidates = manager.build_candidates(
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=3,
+        current_xy=(0.5, 0.5), distance_weight=0.5)
+    assert [candidate.variable for candidate in candidates] == [0, 1, 2]
+    assert candidates[0].x == 0.5
+    assert candidates[0].y == 0.5
+
+
 def test_source_detectability_uses_accessible_sampling_points_only():
     source = {
         'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0}

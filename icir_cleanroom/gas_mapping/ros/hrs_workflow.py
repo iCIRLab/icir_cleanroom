@@ -16,11 +16,13 @@ class HrsWorkflow:
             self.controller.sampled_variables,
             self.controller.navigation_goal_variables)
 
-    def build_candidates(self):
+    def build_candidates(self, current_xy):
         return self.controller.hrs_manager.build_candidates(
             self.controller.gmrf, self.controller.sampled_variables, self.controller.hrs_ucb_k,
             self.controller.hrs_candidate_count,
-            self.controller.navigation_goal_variables)
+            self.controller.navigation_goal_variables,
+            current_xy=current_xy,
+            distance_weight=self.controller.hrs_distance_weight)
 
     def start_hrs_planning(self):
         if self.controller.planning_executor.active_task is not None:
@@ -31,17 +33,18 @@ class HrsWorkflow:
                       else 'no reachable unsampled cells remain')
             self.controller.start_peak_confirmation(reason)
             return
-        candidates = self.controller.build_candidates()
-        self.controller.publish_candidates(candidates)
         current_xy = (
             self.controller.latest_pose.pose.position.x,
             self.controller.latest_pose.pose.position.y)
+        candidates = self.controller.build_candidates(current_xy)
+        self.controller.publish_candidates(candidates)
         max_visits = min(int(self.controller.hrs_visit_count), len(candidates))
         self.controller.publish_phase('HRS_PLANNING')
         self.controller.get_logger().info(
             f'HRS cycle {self.controller.hrs_cycles + 1}: Q_u={len(available)}, '
             f'candidates={len(candidates)}, '
             f'ucb_k={float(self.controller.hrs_ucb_k):.3f}, '
+            f'distance_weight={float(self.controller.hrs_distance_weight):.3f}, '
             f'visit_count={max_visits}, planner={str(self.controller.hrs_planner_mode)}, '
             f'top_M='
             f'{[(cell.row, cell.col, round(cell.reward, 6)) for cell in candidates]}')

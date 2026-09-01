@@ -40,6 +40,7 @@ class DisplayConfig:
 @dataclass(frozen=True)
 class HrsConfig:
     hrs_ucb_k: float = 1.0
+    hrs_distance_weight: float = 0.01
     hrs_stop_margin: float = 0.02
     hrs_min_cycles_per_alert: int = 1
     hrs_max_cycles_per_alert: int = 10
@@ -169,6 +170,12 @@ class ControllerConfig:
                 'history event half-life and kernel sigma must be positive')
         if float(hrs.hrs_ucb_k) < 0.0:
             raise ValueError('hrs_ucb_k must be non-negative')
+
+        if (not math.isfinite(float(hrs.hrs_distance_weight)) or
+                float(hrs.hrs_distance_weight) < 0.0):
+            raise ValueError(
+                'hrs_distance_weight must be finite and non-negative')
+
         if not 0.0 <= float(hrs.hrs_stop_margin) <= 1.0:
             raise ValueError('hrs_stop_margin must be in [0, 1]')
         if not 0.0 < float(hrs.hrs_peak_improvement_epsilon) <= 1.0:

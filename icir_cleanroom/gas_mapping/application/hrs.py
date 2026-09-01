@@ -1,4 +1,5 @@
 """HRS runtime-state owner, candidate policy, and exact planning facade."""
+import math
 
 from ..models import HrsRuntimeState
 from ..planning.hrs import HrsCell, solve_hrs_p2
@@ -37,21 +38,53 @@ class HrsManager:
 
     def build_candidates(
             self, gmrf, sampled_variables, ucb_coefficient, count,
-            eligible_variables=None):
+            eligible_variables=None, current_xy=None, distance_weight=0.0):
+        distance_weight = float(distance_weight)
+        if not math.isfinite(distance_weight) or distance_weight < 0.0:
+            raise ValueError(
+                'distance_weight must be finite and non-negative')
+
+        if distance_weight > 0.0 and current_xy is None:
+            raise ValueError(
+                'current_xy is required when distance_weight is positive')
+
+        if current_xy is not None:
+            current_x, current_y = (
+                float(current_xy[0]), float(current_xy[1]))
+            if not math.isfinite(current_x) or not math.isfinite(current_y):
+                raise ValueError('current_xy must contain finite coordinates')
+        else:
+            current_x = current_y = 0.0
+
         potentials = normalized_ucb(
             gmrf.solution, gmrf.variance, float(ucb_coefficient))
+
         candidates = []
         for variable in self.available_variables(
                 len(gmrf.var_cells), sampled_variables,
                 eligible_variables):
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
+
+            distance = (
+                math.hypot(x - current_x, y - current_y)
+                if current_xy is not None else 0.0)
+
+            ucb = float(potentials[variable])
+            reward = ucb / (1.0 + distance_weight * distance)
+
             candidates.append(HrsCell(
-                variable=variable, row=int(row), col=int(col), x=x, y=y,
-                reward=float(potentials[variable]),
+                variable=variable,
+                row=int(row),
+                col=int(col),
+                x=x,
+                y=y,
+                reward=reward,
                 mean=float(gmrf.solution[variable]),
                 variance=float(gmrf.variance[variable])))
-        candidates.sort(key=lambda cell: (-cell.reward, cell.row, cell.col))
+
+        candidates.sort(
+            key=lambda cell: (-cell.reward, cell.row, cell.col))
         return candidates[:int(count)]
 
     @staticmethod

@@ -19,6 +19,7 @@ gas_mapping_controller_node:
     gabp_retry_damping: 0.25
     gabp_cg_warning_tolerance: 1.0e-4
     hrs_ucb_k: 0.2
+    hrs_distance_weight: 0.03
     hrs_stop_margin: 0.02
     hrs_min_cycles_per_alert: 1
     hrs_max_cycles_per_alert: 10
