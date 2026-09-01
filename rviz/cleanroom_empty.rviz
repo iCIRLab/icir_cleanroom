@@ -46,7 +46,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: GaussianGroundTruthLog
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/ground_truth_log}
     - Alpha: 0.62
@@ -134,7 +134,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: GasConcentrationHistoryRecentLog
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/recent_log}
     - Class: rviz_default_plugins/Marker
