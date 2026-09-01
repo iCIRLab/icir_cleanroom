@@ -25,9 +25,7 @@ _A ROS 2 simulation for history-aware autonomous gas mapping with LRS patrol, GM
 - [설정](#설정)
 - [프로젝트 구조](#프로젝트-구조)
 - [테스트](#테스트)
-- [문제 해결](#문제-해결)
 - [제한사항 및 향후 과제](#제한사항-및-향후-과제)
-- [Citation](#citation)
 - [Maintainer](#maintainer)
 
 ## 프로젝트 개요
@@ -44,8 +42,7 @@ ICIR Cleanroom은 넓은 공간을 효율적으로 순찰하면서 위험 신호
 
 
 ## Demo
-
-[![ICIR Cleanroom Demo]](https://www.youtube.com/watch?v=_rfHPxJ0KWs)
+[![Video](https://img.youtube.com/vi/_rfHPxJ0KWs/0.jpg)](https://www.youtube.com/watch?v=_rfHPxJ0KWs)
 
 데모 영상에서는 다음 과정을 확인할 수 있습니다.
 
