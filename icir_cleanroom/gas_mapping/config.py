@@ -41,13 +41,10 @@ class DisplayConfig:
 class HrsConfig:
     hrs_ucb_k: float = 1.0
     hrs_distance_weight: float = 0.01
-    hrs_stop_margin: float = 0.02
-    hrs_min_cycles_per_alert: int = 1
+    hrs_response_threshold: float = 0.50
     hrs_max_cycles_per_alert: int = 10
-    hrs_peak_improvement_epsilon: float = 0.001
-    hrs_peak_max_moves: int = 10
-    hrs_candidate_count: int = 15
-    hrs_visit_count: int = 10
+    hrs_candidate_count: int = 1
+    hrs_visit_count: int = 1
     hrs_speed: float = 5.0
     hrs_update_seconds: float = 50.0
     hrs_combination_time_limit: float = 5.0
@@ -176,18 +173,10 @@ class ControllerConfig:
             raise ValueError(
                 'hrs_distance_weight must be finite and non-negative')
 
-        if not 0.0 <= float(hrs.hrs_stop_margin) <= 1.0:
-            raise ValueError('hrs_stop_margin must be in [0, 1]')
-        if not 0.0 < float(hrs.hrs_peak_improvement_epsilon) <= 1.0:
-            raise ValueError(
-                'hrs_peak_improvement_epsilon must be in (0, 1]')
-        if int(hrs.hrs_peak_max_moves) <= 0:
-            raise ValueError('hrs_peak_max_moves must be positive')
-        if (int(hrs.hrs_min_cycles_per_alert) <= 0 or
-                int(hrs.hrs_max_cycles_per_alert) <
-                int(hrs.hrs_min_cycles_per_alert)):
-            raise ValueError(
-                'HRS max cycles must be at least the positive minimum')
+        if not 0.0 <= float(hrs.hrs_response_threshold) <= 1.0:
+            raise ValueError('hrs_response_threshold must be in [0, 1]')
+        if int(hrs.hrs_max_cycles_per_alert) <= 0:
+            raise ValueError('hrs_max_cycles_per_alert must be positive')
         if (float(history.history_merge_radius) < 0.0 or
                 float(lrs.lrs_history_replace_radius) < 0.0):
             raise ValueError('history radii must be non-negative')

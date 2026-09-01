@@ -19,7 +19,7 @@ class NavigationWorkflow:
                 return self.controller.lrs_goals[0]
             if self.controller.current_index < len(self.controller.lrs_goals):
                 return self.controller.lrs_goals[self.controller.current_index]
-        if (self.controller.is_hrs_navigation_phase(self.controller.phase) and
+        if (self.controller.phase == 'HRS_NAVIGATION' and
                 self.controller.active_hrs_route is not None and
                 self.controller.current_index < len(self.controller.active_hrs_route.cells)):
             cell = self.controller.active_hrs_route.cells[self.controller.current_index]
@@ -38,8 +38,6 @@ class NavigationWorkflow:
                 self.controller.finish_lrs_navigation()
             elif self.controller.phase == 'HRS_NAVIGATION':
                 self.controller.finish_hrs_cycle()
-            elif self.controller.phase == 'HRS_PEAK_CONFIRMATION':
-                self.controller.finish_peak_confirmation_batch()
             return
 
         goal_pose = copy.deepcopy(target)
@@ -48,14 +46,6 @@ class NavigationWorkflow:
         if self.controller.phase == 'LRS':
             label = ('시작 LRS 포인트 복귀' if self.controller.returning else
                      f'LRS [{self.controller.current_index + 1}/{len(self.controller.lrs_goals)}]')
-        elif self.controller.phase == 'HRS_PEAK_CONFIRMATION':
-            if self.controller.peak_returning:
-                label = 'HRS confirmed peak return'
-            else:
-                label = (
-                    f'HRS peak move {self.controller.peak_move_count} '
-                    f'[{self.controller.current_index + 1}/'
-                    f'{len(self.controller.active_hrs_route.cells)}]')
         else:
             label = (
                 f'HRS cycle {self.controller.hrs_cycles + 1} '
@@ -74,7 +64,7 @@ class NavigationWorkflow:
         if self.controller.phase == 'LRS' and not self.controller.returning and self.controller.lrs_goals:
             following = self.controller.lrs_goals[
                 (self.controller.current_index + 1) % len(self.controller.lrs_goals)]
-        elif (self.controller.is_hrs_navigation_phase(self.controller.phase) and
+        elif (self.controller.phase == 'HRS_NAVIGATION' and
               self.controller.active_hrs_route and
               self.controller.current_index + 1 < len(self.controller.active_hrs_route.cells)):
             cell = self.controller.active_hrs_route.cells[self.controller.current_index + 1]
@@ -98,11 +88,8 @@ class NavigationWorkflow:
         if self.controller.phase == 'LRS' and self.controller.returning:
             self.controller.finish_lrs_navigation()
             return
-        if self.controller.phase == 'HRS_PEAK_CONFIRMATION' and self.controller.peak_returning:
-            self.controller.finish_peak_return()
-            return
         target_variable = None
-        if (self.controller.is_hrs_navigation_phase(self.controller.phase) and
+        if (self.controller.phase == 'HRS_NAVIGATION' and
                 self.controller.active_hrs_route is not None):
             target_variable = int(
                 self.controller.active_hrs_route.cells[self.controller.current_index].variable)
@@ -130,7 +117,7 @@ class NavigationWorkflow:
         if result.mean is None:
             self.controller.get_logger().warning(
                 '농도 표본이 없어 이 포인트를 미측정으로 남깁니다')
-            if self.controller.is_hrs_navigation_phase(self.controller.phase):
+            if self.controller.phase == 'HRS_NAVIGATION':
                 self.controller.record_hrs_failure()
         else:
             value = result.mean
@@ -184,6 +171,10 @@ class NavigationWorkflow:
                 f'pose=({pose.position.x:.3f},{pose.position.y:.3f}), '
                 f'mean={value:.4f}, samples={result.sample_count}, '
                 f'cell=({row},{col})')
+            if (self.controller.phase == 'HRS_NAVIGATION' and
+                    self.controller.confirm_hrs_response(
+                        variable, value, measurement.timestamp)):
+                return
         self.controller.advance_after_target()
 
     def navigation_failed(self, reason):
@@ -200,20 +191,7 @@ class NavigationWorkflow:
         if self.controller.phase == 'LRS' and self.controller.returning:
             self.controller.finish_lrs_navigation()
             return
-        if self.controller.phase == 'HRS_PEAK_CONFIRMATION' and self.controller.peak_returning:
-            self.controller.return_to_lrs(
-                f'peak_unconfirmed: failed to return to confirmed peak '
-                f'({reason})')
-            return
-        if self.controller.phase == 'HRS_PEAK_CONFIRMATION':
-            cell = self.controller.active_hrs_route.cells[self.controller.current_index]
-            self.controller.unreachable_variables.add(cell.variable)
-            self.controller.failure_counts[cell.variable] = int(self.controller.max_cell_failures)
-            self.controller.get_logger().error(
-                f'HRS 최고점 이웃 ({cell.row},{cell.col})가 '
-                f'{int(self.controller.max_retries) + 1}회 이동 실패하여 '
-                '국소 최고점을 확인할 수 없습니다')
-        elif self.controller.phase == 'HRS_NAVIGATION':
+        if self.controller.phase == 'HRS_NAVIGATION':
             self.controller.record_hrs_failure()
         self.controller.advance_after_target()
 
@@ -233,10 +211,9 @@ class NavigationWorkflow:
             if self.controller.current_index >= len(self.controller.lrs_goals):
                 self.controller.returning = True
             self.controller.send_current_goal()
-        elif self.controller.is_hrs_navigation_phase(self.controller.phase):
+        elif self.controller.phase == 'HRS_NAVIGATION':
             self.controller.publish_hrs_status()
             self.controller.send_current_goal()
 
 
 __all__ = ['NavigationWorkflow']
-

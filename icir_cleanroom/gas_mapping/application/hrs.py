@@ -3,7 +3,7 @@ import math
 
 from ..models import HrsRuntimeState
 from ..planning.hrs import HrsCell, solve_hrs_p2
-from ..planning.hrs_policy import normalized_ucb, peak_search_status
+from ..planning.hrs_policy import distance_discounted_ucb
 
 
 class HrsManager:
@@ -56,8 +56,15 @@ class HrsManager:
         else:
             current_x = current_y = 0.0
 
-        potentials = normalized_ucb(
-            gmrf.solution, gmrf.variance, float(ucb_coefficient))
+        distances = []
+        for variable in range(len(gmrf.var_cells)):
+            x, y = gmrf.cell_center(variable)
+            distances.append(
+                math.hypot(x - current_x, y - current_y)
+                if current_xy is not None else 0.0)
+        potentials = distance_discounted_ucb(
+            gmrf.solution, gmrf.variance, distances,
+            float(ucb_coefficient), distance_weight)
 
         candidates = []
         for variable in self.available_variables(
@@ -66,12 +73,7 @@ class HrsManager:
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
 
-            distance = (
-                math.hypot(x - current_x, y - current_y)
-                if current_xy is not None else 0.0)
-
-            ucb = float(potentials[variable])
-            reward = ucb / (1.0 + distance_weight * distance)
+            reward = float(potentials[variable])
 
             candidates.append(HrsCell(
                 variable=variable,
@@ -107,21 +109,14 @@ class HrsManager:
         return None, attempts
 
     @staticmethod
-    def stop_decision(cycles, converged, minimum_cycles, maximum_cycles):
-        if int(cycles) >= int(minimum_cycles) and bool(converged):
-            return 'converged'
-        if int(cycles) >= int(maximum_cycles):
-            return 'max_cycles'
-        return None
-
-    def evaluate_stop(
-            self, gmrf, sampled_variables, best_observed,
-            ucb_coefficient, margin, eligible_variables=None):
-        available = self.available_variables(
-            len(gmrf.var_cells), sampled_variables, eligible_variables)
-        return peak_search_status(
-            gmrf.solution, gmrf.variance, available, best_observed,
-            ucb_coefficient, margin)
+    def reached_response_threshold(value, threshold):
+        value = float(value)
+        threshold = float(threshold)
+        if not math.isfinite(value):
+            raise ValueError('measured value must be finite')
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError('response threshold must be in [0, 1]')
+        return value >= threshold
 
 
 __all__ = ['HrsManager']

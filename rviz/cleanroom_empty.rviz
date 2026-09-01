@@ -75,8 +75,8 @@ Visualization Manager:
       Color Scheme: costmap
       Draw Behind: false
       Enabled: false
-      Name: HRSPotentialUCB
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/reward}
+      Name: HRSPotentialDDUCB
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dd_ucb}
     - Alpha: 0.55
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
@@ -143,8 +143,8 @@ Visualization Manager:
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/revisit}
     - Class: rviz_default_plugins/Marker
       Enabled: true
-      Name: HistoryConfirmedPeaks
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/confirmed_peaks}
+      Name: HistoryConfirmedEvents
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/history/confirmed_events}
     - Class: rviz_default_plugins/Marker
       Enabled: false
       Name: LRSStatus

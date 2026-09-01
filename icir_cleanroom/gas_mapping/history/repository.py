@@ -37,17 +37,17 @@ class HistoryRepository:
             'history_recent': history.history_recent.ravel().tolist(),
             'recent_alpha': history.recent_alpha,
             'confirmed_event_sequence': history.confirmed_event_sequence,
-            'confirmed_peak_events': sorted(
-                history.confirmed_peak_events.values(),
+            'confirmed_events': sorted(
+                history.confirmed_events.values(),
                 key=lambda item: (
                     int(item['sequence']), str(item['event_id']))),
         }
 
     @staticmethod
     def _load_payload(history, payload):
-        """Validate and atomically apply a version 1, 2, or 3 payload."""
+        """Validate and atomically apply a version 1 through 4 payload."""
         version = int(payload.get('version', -1))
-        if version not in (1, 2, history.VERSION):
+        if version not in (1, 2, 3, history.VERSION):
             raise ValueError('unsupported gas history version')
         metadata = payload.get('map', {})
         expected = HistoryRepository._metadata(history)
@@ -123,7 +123,7 @@ class HistoryRepository:
                     raw_recent.reshape(history.height, history.width), 0.0, 1.0)
                 history_recent[~history.free] = 0.0
 
-        confirmed_peak_events = {}
+        confirmed_events = {}
         confirmed_event_sequence = 0
         if version >= 3:
             stored_sequence = int(
@@ -132,26 +132,43 @@ class HistoryRepository:
                 raise ValueError(
                     'confirmed_event_sequence must be non-negative')
             sequences = set()
-            for raw in payload.get('confirmed_peak_events', []):
+            event_key = (
+                'confirmed_peak_events' if version == 3
+                else 'confirmed_events')
+            for raw in payload.get(event_key, []):
                 event_id = str(raw['event_id'])
                 if not event_id:
                     raise ValueError('confirmed event id must not be empty')
-                if event_id in confirmed_peak_events:
+                if event_id in confirmed_events:
                     raise ValueError('duplicate confirmed event id')
                 sequence = int(raw['sequence'])
                 if sequence <= 0 or sequence in sequences:
                     raise ValueError('invalid confirmed event sequence')
                 row, col = history._validate_cell(
                     raw['row'], raw['col'], require_free=True)
-                confirmed_peak_events[event_id] = {
+                method = str(raw.get(
+                    'method', 'peak_confirmation' if version == 3 else ''))
+                if method not in history.CONFIRMATION_METHODS:
+                    raise ValueError('invalid confirmation method')
+                raw_threshold = raw.get('response_threshold')
+                threshold = (
+                    None if raw_threshold is None else
+                    history._clamped_value(
+                        raw_threshold, 'response_threshold'))
+                if method == 'threshold_crossing' and threshold is None:
+                    raise ValueError(
+                        'threshold crossing event has no response threshold')
+                confirmed_events[event_id] = {
                     'event_id': event_id,
                     'sequence': sequence,
                     'row': row,
                     'col': col,
                     'value': history._clamped_value(
-                        raw['value'], 'confirmed peak value'),
+                        raw['value'], 'confirmed event value'),
+                    'response_threshold': threshold,
                     'timestamp': history._finite_timestamp(
-                        raw['timestamp'], 'confirmed peak timestamp'),
+                        raw['timestamp'], 'confirmed event timestamp'),
+                    'method': method,
                 }
                 sequences.add(sequence)
             maximum_sequence = max(sequences, default=0)
@@ -165,7 +182,7 @@ class HistoryRepository:
         history.history_mean = history_mean
         history.history_recent = history_recent
         history.history_count = history_count
-        history.confirmed_peak_events = confirmed_peak_events
+        history.confirmed_events = confirmed_events
         history.confirmed_event_sequence = confirmed_event_sequence
         return True
 

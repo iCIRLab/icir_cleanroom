@@ -1,11 +1,12 @@
 """Hrs Workflow adapter."""
 
-from ..application.hrs import HrsManager
 from ..models import PlanningKind
 
 
 class HrsWorkflow:
-    METHODS = ['available_variables','build_candidates','start_hrs_planning','plan_with_fallback','finish_hrs_cycle','hrs_stop_decision','evaluate_hrs_stop']
+    METHODS = [
+        'available_variables', 'build_candidates', 'start_hrs_planning',
+        'plan_with_fallback', 'confirm_hrs_response', 'finish_hrs_cycle']
 
     def __init__(self, controller):
         self.controller = controller
@@ -31,11 +32,13 @@ class HrsWorkflow:
         if not available:
             reason = ('all reachable cells sampled' if not self.controller.unreachable_variables
                       else 'no reachable unsampled cells remain')
-            self.controller.start_peak_confirmation(reason)
+            self.controller.return_to_lrs(
+                f'HRS response threshold not reached: {reason}')
             return
         current_xy = (
             self.controller.latest_pose.pose.position.x,
             self.controller.latest_pose.pose.position.y)
+        self.controller.publish_dd_ucb(current_xy)
         candidates = self.controller.build_candidates(current_xy)
         self.controller.publish_candidates(candidates)
         max_visits = min(int(self.controller.hrs_visit_count), len(candidates))
@@ -58,6 +61,45 @@ class HrsWorkflow:
             candidates, current_xy, max_visits, self.controller.config.hrs,
             self.controller.hrs_dwell_seconds)
 
+    def confirm_hrs_response(self, variable, value, timestamp):
+        threshold = float(self.controller.hrs_response_threshold)
+        if not self.controller.hrs_manager.reached_response_threshold(
+                value, threshold):
+            return False
+
+        row, col = self.controller.gmrf.var_cells[int(variable)]
+        try:
+            inserted = self.controller.history.record_confirmed_event(
+                self.controller.current_event_id, int(row), int(col),
+                float(value), threshold, float(timestamp),
+                method='threshold_crossing')
+        except (TypeError, ValueError) as error:
+            self.controller.get_logger().error(
+                f'HRS 확정 검출 이벤트 기록 실패: {error}')
+            inserted = False
+        if inserted:
+            self.controller.get_logger().warning(
+                f'HRS 대응 임계값 검출: cell=({int(row)},{int(col)}), '
+                f'value={float(value):.4f} >= threshold={threshold:.4f}')
+        else:
+            self.controller.get_logger().warning(
+                f'HRS 대응 이벤트가 이미 기록되었거나 저장할 수 없습니다: '
+                f'event={self.controller.current_event_id}')
+
+        # Persist the authoritative measurement event before any optional
+        # GMRF recovery or external source-transition operation.
+        self.controller.publish_history()
+        self.controller.persist_history('HRS response threshold detection')
+        if self.controller.hrs_gmrf_dirty:
+            if not self.controller.finalize_hrs_gmrf_batch(
+                    'HRS response threshold detection'):
+                self.controller.get_logger().warning(
+                    '확정 검출은 유지하지만 최종 GMRF 복구에는 실패했습니다')
+        self.controller.start_source_transition(
+            f'response threshold detected at ({int(row)},{int(col)}), '
+            f'value={float(value):.4f}, threshold={threshold:.4f}')
+        return True
+
     def finish_hrs_cycle(self):
         actual_seconds = (
             (self.controller.get_clock().now().nanoseconds - self.controller.hrs_cycle_started_ns)
@@ -79,59 +121,21 @@ class HrsWorkflow:
         self.controller.persist_history(f'HRS cycle {self.controller.hrs_cycles}')
         self.controller.active_hrs_route = None
         if not map_updated:
-            self.controller.get_logger().warning(
-                f'HRS 수렴 판정 보류: '
-                f'alert_cycle={self.controller.hrs_cycles_in_alert}, '
-                'dirty GaBP map could not be recovered')
-            if self.controller.available_variables():
-                self.controller.start_hrs_planning()
-            else:
-                self.controller.return_to_lrs(
-                    'peak_unconfirmed: GMRF update failed and no '
-                    'unvisited cell remains')
+            self.controller.return_to_lrs(
+                'HRS response threshold not reached: GMRF update failed')
             return
-        converged, detail = self.controller.evaluate_hrs_stop()
-        self.controller.get_logger().info(detail)
-        decision = self.controller.hrs_stop_decision(
-            self.controller.hrs_cycles_in_alert, converged,
-            int(self.controller.hrs_min_cycles_per_alert),
-            int(self.controller.hrs_max_cycles_per_alert))
-        if decision == 'converged':
-            self.controller.start_peak_confirmation(
-                'no reachable unvisited cell has a higher concentration '
-                'potential')
-        elif decision == 'max_cycles':
-            self.controller.start_peak_confirmation(
-                f'HRS maximum {self.controller.hrs_max_cycles_per_alert} cycles reached '
-                'without convergence')
-        else:
-            self.controller.start_hrs_planning()
-
-    @staticmethod
-    @staticmethod
-    def hrs_stop_decision(cycles, converged, minimum_cycles, maximum_cycles):
-        return HrsManager.stop_decision(
-            cycles, converged, minimum_cycles, maximum_cycles)
-
-    def evaluate_hrs_stop(self):
-        converged, variable, maximum, gap = self.controller.hrs_manager.evaluate_stop(
-            self.controller.gmrf, self.controller.sampled_variables, self.controller.event_best_observed,
-            float(self.controller.hrs_ucb_k), float(self.controller.hrs_stop_margin),
-            self.controller.navigation_goal_variables)
-        if variable is None:
-            return True, (
-                f'HRS 수렴 판정: alert_cycle={self.controller.hrs_cycles_in_alert}, '
-                f'best_observed={self.controller.event_best_observed:.4f}, '
-                'available=0, converged=True')
-        row, col = self.controller.gmrf.var_cells[variable]
-        x, y = self.controller.gmrf.cell_center(variable)
-        return converged, (
-            f'HRS 수렴 판정: alert_cycle={self.controller.hrs_cycles_in_alert}, '
-            f'best_observed={self.controller.event_best_observed:.4f}, '
-            f'best_unvisited_potential={maximum:.4f}, gap={gap:.4f}, '
-            f'margin={float(self.controller.hrs_stop_margin):.4f}, '
-            f'cell=({int(row)},{int(col)}), '
-            f'position=({x:.3f},{y:.3f}), converged={converged}')
+        if (self.controller.hrs_cycles_in_alert >=
+                int(self.controller.hrs_max_cycles_per_alert)):
+            self.controller.return_to_lrs(
+                f'HRS response threshold {float(self.controller.hrs_response_threshold):.4f} '
+                f'not reached after {self.controller.hrs_cycles_in_alert} cycles')
+            return
+        if not self.controller.available_variables():
+            self.controller.return_to_lrs(
+                'HRS response threshold not reached: no reachable '
+                'unvisited cells remain')
+            return
+        self.controller.start_hrs_planning()
 
 
 __all__ = ['HrsWorkflow']

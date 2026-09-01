@@ -18,7 +18,6 @@ from ..application.lrs import LrsManager
 from ..application.measurement import MeasurementManager
 from ..application.navigation import NavigationManager
 from ..application.orchestrator import MappingOrchestrator
-from ..application.peak_confirmation import PeakConfirmationManager
 from ..application.planning_executor import PlanningExecutor
 from ..config import declare_controller_config
 from ..history import GasHistoryStore
@@ -28,13 +27,12 @@ from ..mapping.grid_geometry import GridGeometry
 from ..mapping.path_distance import SamplingDistanceOracle
 from ..models import (
     HrsRuntimeState, LrsRuntimeState, MappingEventState, NavigationState,
-    PeakSearchState, SourceTransitionState, StateField)
+    SourceTransitionState, StateField)
 from ..phase_machine import PhaseMachine
 from .nav2_client import Nav2Client
 from .hrs_workflow import HrsWorkflow
 from .lrs_workflow import LrsWorkflow
 from .navigation_workflow import NavigationWorkflow
-from .peak_workflow import PeakWorkflow
 from .planning_workflow import PlanningWorkflow
 from .publishers import ControllerVisualization, MappingPublishers
 from .source_transition import SourceTransitionWorkflow
@@ -69,8 +67,6 @@ class GasMappingControllerNode(Node):
 
     sampled_variables = StateField('event_state', 'sampled_variables')
     hrs_values = StateField('event_state', 'measured_by_variable')
-    event_best_observed = StateField('event_state', 'best_value')
-    event_best_variable = StateField('event_state', 'best_variable')
     history_snapshot_pending = StateField(
         'event_state', 'snapshot_pending')
     current_event_id = StateField('event_state', 'event_id')
@@ -85,10 +81,6 @@ class GasMappingControllerNode(Node):
         'hrs_state', 'unreachable_variables')
     hrs_gmrf_dirty = StateField('hrs_state', 'dirty')
 
-    peak_anchor_variable = StateField('peak_state', 'anchor_variable')
-    peak_move_count = StateField('peak_state', 'move_count')
-    peak_trigger_reason = StateField('peak_state', 'trigger_reason')
-    peak_returning = StateField('peak_state', 'returning')
     source_transition_reason = StateField(
         'source_transition_state', 'reason')
 
@@ -103,7 +95,6 @@ class GasMappingControllerNode(Node):
         self.lrs_state = LrsRuntimeState()
         self.event_state = MappingEventState()
         self.hrs_state = HrsRuntimeState()
-        self.peak_state = PeakSearchState()
         self.source_transition_state = SourceTransitionState()
         self.gmrf_service = GmrfService(self.config.gmrf)
 
@@ -176,13 +167,7 @@ class GasMappingControllerNode(Node):
         self.hrs_cycles_in_alert = 0
         self.lrs_lap = 0
         self.lap_max_concentration = 0.0
-        self.event_best_observed = 0.0
-        self.event_best_variable = None
         self.lap_hazard_detected = False
-        self.peak_anchor_variable = None
-        self.peak_move_count = 0
-        self.peak_trigger_reason = ''
-        self.peak_returning = False
         self.hrs_gmrf_dirty = False
         self.history_snapshot_pending = False
         self.source_advance_future = None
@@ -193,18 +178,16 @@ class GasMappingControllerNode(Node):
         self.navigation_manager = NavigationManager(self.navigation_state)
         self.lrs_manager = LrsManager(self.lrs_state)
         self.hrs_manager = HrsManager(self.hrs_state)
-        self.peak_manager = PeakConfirmationManager(self.peak_state)
         self.measurement_manager = MeasurementManager()
         self.orchestrator = MappingOrchestrator(
             self.phase_machine, self.navigation_manager, self.lrs_manager,
-            self.hrs_manager, self.peak_manager, self.event_state,
+            self.hrs_manager, self.event_state,
             self.source_transition_state)
         self.planning_executor = PlanningExecutor()
         self.nav2 = Nav2Client(self, self.navigation_manager)
         self.workflow_adapters = [
             LrsWorkflow(self), HrsWorkflow(self), PlanningWorkflow(self),
-            PeakWorkflow(self), NavigationWorkflow(self),
-            SourceTransitionWorkflow(self),
+            NavigationWorkflow(self), SourceTransitionWorkflow(self),
         ]
         for workflow in self.workflow_adapters:
             for name in workflow.METHODS:
@@ -375,13 +358,8 @@ class GasMappingControllerNode(Node):
         self.phase_pub.publish(String(data=phase_text))
         self.get_logger().info(f'Gas mapping phase: {phase_text}')
 
-    @staticmethod
-    def is_hrs_navigation_phase(phase):
-        return phase in ('HRS_NAVIGATION', 'HRS_PEAK_CONFIRMATION')
-
     def record_event_measurement(self, variable, value):
-        self.orchestrator.record_event_measurement(
-            variable, value, self.gmrf.var_cells)
+        self.orchestrator.record_event_measurement(variable, value)
 
 
 

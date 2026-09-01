@@ -18,10 +18,9 @@ class SourceTransitionWorkflow:
             return
 
         self.controller.get_logger().info(
-            f'HRS 실측 최고점 확정 후 가스원 전환: {reason}')
+            f'HRS 대응 임계값 검출 후 가스원 전환: {reason}')
         self.controller.commit_history_snapshot(
             f'confirmed hazard event ending after LRS lap {self.controller.lrs_lap}')
-        self.controller.peak_returning = False
         self.controller.active_hrs_route = None
         self.controller.publish_empty_hrs_route()
         self.controller.clear_hrs_candidates()
@@ -139,7 +138,6 @@ class SourceTransitionWorkflow:
         self.controller.get_logger().info(f'HRS 종료 후 LRS 복귀: {reason}')
         self.controller.commit_history_snapshot(
             f'hazard event ending after LRS lap {self.controller.lrs_lap}')
-        self.controller.peak_returning = False
         self.controller.active_hrs_route = None
         self.controller.publish_empty_hrs_route()
         self.controller.clear_hrs_candidates()
@@ -148,4 +146,3 @@ class SourceTransitionWorkflow:
 
 
 __all__ = ['SourceTransitionWorkflow']
-

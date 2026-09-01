@@ -11,7 +11,6 @@ class MappingPhase(str, Enum):
     LRS = 'LRS'
     HRS_PLANNING = 'HRS_PLANNING'
     HRS_NAVIGATION = 'HRS_NAVIGATION'
-    HRS_PEAK_CONFIRMATION = 'HRS_PEAK_CONFIRMATION'
     SOURCE_TRANSITION = 'SOURCE_TRANSITION'
     COMPLETE = 'COMPLETE'
 
@@ -50,15 +49,11 @@ class MappingEventState:
     event_id: str = ''
     sampled_variables: Set[int] = field(default_factory=set)
     measured_by_variable: Dict[int, float] = field(default_factory=dict)
-    best_value: float = 0.0
-    best_variable: Optional[int] = None
     snapshot_pending: bool = False
 
     def reset_measurements(self):
         self.sampled_variables.clear()
         self.measured_by_variable.clear()
-        self.best_value = 0.0
-        self.best_variable = None
 
 
 @dataclass
@@ -113,20 +108,6 @@ class HrsRuntimeState:
 
 
 @dataclass
-class PeakSearchState:
-    anchor_variable: Optional[int] = None
-    move_count: int = 0
-    trigger_reason: str = ''
-    returning: bool = False
-
-    def reset(self):
-        self.anchor_variable = None
-        self.move_count = 0
-        self.trigger_reason = ''
-        self.returning = False
-
-
-@dataclass
 class SourceTransitionState:
     generation: int = 0
     reason: str = ''
@@ -163,6 +144,6 @@ class StateField:
 __all__ = [
     'GasMeasurement', 'HrsRuntimeState', 'LrsRuntimeState',
     'MappingEventState', 'MappingPhase', 'NavigationState',
-    'PeakSearchState', 'PlanningKind', 'PlanningTask', 'Pose2D',
+    'PlanningKind', 'PlanningTask', 'Pose2D',
     'SourceTransitionState', 'StateField',
 ]

@@ -7,8 +7,7 @@ import time
 
 from mip import BINARY, CBC, Model, OptimizationStatus, minimize, xsum
 
-from .exact_path import (
-    solve_held_karp_free_end_path, solve_held_karp_open_path)
+from .exact_path import solve_held_karp_open_path
 
 
 REWARD_ORDERED_EXACT = 'reward_ordered_exact'
@@ -207,22 +206,6 @@ def _route_result(ordered, reward, length, speed, dwell_seconds,
         solver=solver,
         planning_seconds=planning_seconds,
     )
-
-
-def solve_peak_confirmation_route(cells, start_xy, speed=5.0,
-                                  dwell_seconds=2.0):
-    """Plan an exact shortest route through one peak's unmeasured neighbors."""
-    if speed <= 0.0 or dwell_seconds < 0.0:
-        raise ValueError('peak-confirmation timing parameters are invalid')
-    started = time.monotonic()
-    solved = solve_held_karp_free_end_path(cells, start_xy)
-    if solved is None:
-        return None
-    ordered, length = solved
-    reward = float(sum(cell.reward for cell in cells))
-    return _route_result(
-        ordered, reward, length, speed, dwell_seconds, len(cells), 1, 1,
-        0, 1, 'HELD_KARP_PEAK', time.monotonic() - started)
 
 
 def solve_reward_ordered_p2(candidates, start_xy, visit_count=10, speed=5.0,
