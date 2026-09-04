@@ -8,18 +8,28 @@ from geometry_msgs.msg import Point, Pose, PoseArray, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from std_msgs.msg import (
     Bool, ColorRGBA, Float32MultiArray, Int32, String)
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 
 from ..mapping.field_projection import (
     logarithmic_display as transform_logarithmic_display, project_field)
-from ..planning.hrs_policy import distance_discounted_ucb
+from ..planning.hrs_policy import distance_discounted_ucb, normalized_ucb
 
 
 PUBLISHER_SPECS = (
     ('estimate_pub', OccupancyGrid, '/gas_mapping/estimate'),
     ('estimate_log_pub', OccupancyGrid, '/gas_mapping/estimate_log'),
     ('variance_pub', OccupancyGrid, '/gas_mapping/variance'),
+    ('estimate_labels_pub', MarkerArray, '/gas_mapping/estimate_labels'),
+    ('variance_labels_pub', MarkerArray, '/gas_mapping/variance_labels'),
+    ('ucb_pub', OccupancyGrid, '/gas_mapping/hrs/ucb'),
     ('dd_ucb_pub', OccupancyGrid, '/gas_mapping/hrs/dd_ucb'),
+    ('ucb_labels_pub', MarkerArray, '/gas_mapping/hrs/ucb_labels'),
+    ('dd_ucb_labels_pub', MarkerArray,
+     '/gas_mapping/hrs/dd_ucb_labels'),
+    ('measurement_grid_pub', OccupancyGrid,
+     '/gas_mapping/measurements/grid'),
+    ('measurement_labels_pub', MarkerArray,
+     '/gas_mapping/measurements/value_labels'),
     ('poses_pub', PoseArray, '/gas_mapping/measurements/poses'),
     ('values_pub', Float32MultiArray, '/gas_mapping/measurements/values'),
     ('lrs_status_pub', Marker, '/gas_mapping/lrs/status'),
@@ -87,7 +97,8 @@ class ControllerVisualization:
 
     METHODS = (
         'clear_hrs_candidates', 'display_field', 'occupancy_grid',
-        'publish_maps', 'publish_dd_ucb', 'logarithmic_display',
+        'publish_maps', 'publish_ucb', 'publish_dd_ucb',
+        'logarithmic_display',
         'publish_measurements',
         'publish_lrs_active_route', 'publish_lrs_reward',
         'publish_lrs_priority_candidates', 'publish_lrs_priority_route',
@@ -126,6 +137,9 @@ class ControllerVisualization:
     def publish_maps(self):
         template, mean, free = self.controller.display_field(self.controller.gmrf.solution)
         self.controller.estimate_pub.publish(self.controller.occupancy_grid(template, mean, free))
+        self.controller.estimate_labels_pub.publish(self.field_value_labels(
+            self.controller.gmrf.solution,
+            'gas_mapping_estimate_values', (1.0, 1.0, 1.0)))
 
         log_normalized = self.controller.logarithmic_display(mean)
         self.controller.estimate_log_pub.publish(
@@ -135,7 +149,51 @@ class ControllerVisualization:
             self.controller.gmrf.variance)
         self.controller.variance_pub.publish(self.controller.occupancy_grid(
             variance_template, variance, variance_free))
+        self.controller.variance_labels_pub.publish(self.field_value_labels(
+            self.controller.gmrf.variance,
+            'gas_mapping_variance_values', (0.0, 1.0, 1.0)))
+        self.publish_ucb()
         self.publish_dd_ucb()
+
+    def field_value_labels(self, values, namespace, color):
+        array = MarkerArray()
+        stamp = self.controller.get_clock().now().to_msg()
+        text_height = max(
+            0.08, min(0.24, float(self.controller.gmrf.resolution) * 0.28))
+        for variable, value in enumerate(np.asarray(values, dtype=float)):
+            if not math.isfinite(float(value)):
+                continue
+            x, y = self.controller.gmrf.cell_center(variable)
+            marker = Marker()
+            marker.header.frame_id = 'map'
+            marker.header.stamp = stamp
+            marker.ns = namespace
+            marker.id = int(variable)
+            marker.type = Marker.TEXT_VIEW_FACING
+            marker.action = Marker.ADD
+            marker.pose.position.x = float(x)
+            marker.pose.position.y = float(y)
+            marker.pose.position.z = 0.12
+            marker.pose.orientation.w = 1.0
+            marker.scale.z = text_height
+            marker.color = ColorRGBA(
+                r=float(color[0]), g=float(color[1]),
+                b=float(color[2]), a=1.0)
+            marker.text = f'{float(value):.3f}'
+            array.markers.append(marker)
+        return array
+
+    def publish_ucb(self):
+        if self.controller.gmrf is None:
+            return
+        ucb = normalized_ucb(
+            self.controller.gmrf.solution, self.controller.gmrf.variance,
+            float(self.controller.hrs_ucb_k))
+        template, values, free = self.controller.display_field(ucb)
+        self.controller.ucb_pub.publish(
+            self.controller.occupancy_grid(template, values, free))
+        self.controller.ucb_labels_pub.publish(self.field_value_labels(
+            ucb, 'gas_mapping_hrs_ucb_values', (1.0, 1.0, 1.0)))
 
     def publish_dd_ucb(self, current_xy=None):
         if self.controller.gmrf is None:
@@ -159,6 +217,8 @@ class ControllerVisualization:
         template, values, free = self.controller.display_field(dd_ucb)
         self.controller.dd_ucb_pub.publish(
             self.controller.occupancy_grid(template, values, free))
+        self.controller.dd_ucb_labels_pub.publish(self.field_value_labels(
+            dd_ucb, 'gas_mapping_hrs_dd_ucb_values', (1.0, 1.0, 0.0)))
 
     def logarithmic_display(self, values):
         return transform_logarithmic_display(
@@ -180,6 +240,29 @@ class ControllerVisualization:
         self.controller.values_pub.publish(Float32MultiArray(data=[
             measurement.value
             for measurement in self.controller.measurement_manager.measurements]))
+
+        latest_by_variable = {}
+        for measurement in self.controller.measurement_manager.measurements:
+            latest_by_variable[int(measurement.variable)] = float(measurement.value)
+        grid_values = np.zeros(
+            (self.controller.gmrf.height, self.controller.gmrf.width),
+            dtype=float)
+        measured_mask = np.zeros(grid_values.shape, dtype=bool)
+        label_values = np.full(len(self.controller.gmrf.var_cells), np.nan)
+        for variable, value in latest_by_variable.items():
+            if variable < 0 or variable >= len(self.controller.gmrf.var_cells):
+                continue
+            row, col = self.controller.gmrf.var_cells[variable]
+            grid_values[int(row), int(col)] = value
+            measured_mask[int(row), int(col)] = True
+            label_values[variable] = value
+        self.controller.measurement_grid_pub.publish(
+            self.controller.occupancy_grid(
+                self.controller.map_msg, grid_values, measured_mask))
+        self.controller.measurement_labels_pub.publish(
+            self.field_value_labels(
+                label_values, 'gas_mapping_measured_values',
+                (1.0, 0.45, 0.0)))
 
     def publish_lrs_active_route(self):
         path = Path()

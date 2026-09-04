@@ -30,7 +30,14 @@ topics:
       - /gas_mapping/estimate
       - /gas_mapping/estimate_log
       - /gas_mapping/variance
+      - /gas_mapping/estimate_labels
+      - /gas_mapping/variance_labels
+      - /gas_mapping/hrs/ucb
       - /gas_mapping/hrs/dd_ucb
+      - /gas_mapping/hrs/ucb_labels
+      - /gas_mapping/hrs/dd_ucb_labels
+      - /gas_mapping/measurements/grid
+      - /gas_mapping/measurements/value_labels
       - /gas_mapping/measurements/poses
       - /gas_mapping/measurements/values
       - /gas_mapping/lrs/status
