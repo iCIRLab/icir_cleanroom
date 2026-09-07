@@ -4,9 +4,6 @@ from dataclasses import asdict, dataclass
 import math
 
 
-HRS_PLANNER_MODES = ('reward_ordered_exact', 'paper_exhaustive_milp')
-
-
 @dataclass(frozen=True)
 class NavigationConfig:
     lrs_dwell_seconds: float = 1.0
@@ -39,16 +36,11 @@ class DisplayConfig:
 
 @dataclass(frozen=True)
 class HrsConfig:
-    hrs_ucb_k: float = 1.0
-    hrs_distance_weight: float = 0.01
-    hrs_response_threshold: float = 0.50
+    hrs_ucb_k: float = 0.2
+    hrs_distance_weight: float = 0.03
+    hrs_candidate_threshold: float | None = None
+    hrs_response_threshold: float = 0.90
     hrs_max_cycles_per_alert: int = 10
-    hrs_candidate_count: int = 1
-    hrs_visit_count: int = 1
-    hrs_speed: float = 5.0
-    hrs_update_seconds: float = 50.0
-    hrs_combination_time_limit: float = 5.0
-    hrs_planner_mode: str = 'reward_ordered_exact'
     hazard_threshold: float = 0.2
 
 
@@ -116,7 +108,9 @@ class ControllerConfig:
         for group in (
                 self.navigation, self.gmrf, self.display, self.hrs,
                 self.lrs, self.history):
-            values.update(asdict(group))
+            values.update({
+                name: value for name, value in asdict(group).items()
+                if value is not None})
         values['source_advance_timeout_seconds'] = (
             self.source_advance_timeout_seconds)
         return values
@@ -127,8 +121,6 @@ class ControllerConfig:
         if min(float(nav.lrs_dwell_seconds),
                float(nav.hrs_dwell_seconds)) < 0.0:
             raise ValueError('dwell time must be non-negative')
-        if int(hrs.hrs_candidate_count) <= 0 or int(hrs.hrs_visit_count) <= 0:
-            raise ValueError('HRS candidate and visit counts must be positive')
         if not 0.0 <= float(hrs.hazard_threshold) <= 1.0:
             raise ValueError('hazard_threshold must be in [0, 1]')
         if int(history.history_top_k) <= 0:
@@ -165,13 +157,19 @@ class ControllerConfig:
                 float(history.history_event_kernel_sigma) <= 0.0):
             raise ValueError(
                 'history event half-life and kernel sigma must be positive')
-        if float(hrs.hrs_ucb_k) < 0.0:
-            raise ValueError('hrs_ucb_k must be non-negative')
+        if (not math.isfinite(float(hrs.hrs_ucb_k)) or
+                float(hrs.hrs_ucb_k) < 0.0):
+            raise ValueError('hrs_ucb_k must be finite and non-negative')
 
         if (not math.isfinite(float(hrs.hrs_distance_weight)) or
                 float(hrs.hrs_distance_weight) < 0.0):
             raise ValueError(
                 'hrs_distance_weight must be finite and non-negative')
+        if hrs.hrs_candidate_threshold is None:
+            raise ValueError('hrs_candidate_threshold is required')
+        if (not math.isfinite(float(hrs.hrs_candidate_threshold)) or
+                not 0.0 <= float(hrs.hrs_candidate_threshold) <= 1.0):
+            raise ValueError('hrs_candidate_threshold must be in [0, 1]')
 
         if not 0.0 <= float(hrs.hrs_response_threshold) <= 1.0:
             raise ValueError('hrs_response_threshold must be in [0, 1]')
@@ -180,30 +178,30 @@ class ControllerConfig:
         if (float(history.history_merge_radius) < 0.0 or
                 float(lrs.lrs_history_replace_radius) < 0.0):
             raise ValueError('history radii must be non-negative')
-        if (float(hrs.hrs_speed) <= 0.0 or
-                float(hrs.hrs_update_seconds) <= 0.0):
-            raise ValueError('HRS speed and update period must be positive')
         if not 0.0 < float(gmrf.gabp_damping) <= 1.0:
             raise ValueError('GaBP damping must be in (0, 1]')
         if not 0.0 < float(gmrf.gabp_retry_damping) <= 1.0:
             raise ValueError('GaBP retry damping must be in (0, 1]')
-        if str(hrs.hrs_planner_mode) not in HRS_PLANNER_MODES:
-            raise ValueError(
-                f'hrs_planner_mode must be one of {HRS_PLANNER_MODES}')
         timeout = float(self.source_advance_timeout_seconds)
         if not math.isfinite(timeout) or timeout <= 0.0:
             raise ValueError('source_advance_timeout_seconds must be positive')
 
 
 DEFAULT_CONTROLLER_PARAMETERS = ControllerConfig.defaults().flat_values()
+REQUIRED_CONTROLLER_PARAMETERS = ('hrs_candidate_threshold',)
 
 
 def declare_controller_config(node):
     """Declare all public ROS parameters and return their typed snapshot."""
+    from rclpy.parameter import Parameter
+
     values = {}
     for name, default in DEFAULT_CONTROLLER_PARAMETERS.items():
         node.declare_parameter(name, default)
         values[name] = node.get_parameter(name).value
+    required = node.declare_parameter(
+        REQUIRED_CONTROLLER_PARAMETERS[0], Parameter.Type.DOUBLE)
+    values[REQUIRED_CONTROLLER_PARAMETERS[0]] = required.value
     return ControllerConfig.from_mapping(values)
 
 
@@ -211,4 +209,5 @@ __all__ = [
     'ControllerConfig', 'DisplayConfig', 'GmrfConfig', 'HistoryConfig',
     'HrsConfig', 'LrsConfig', 'NavigationConfig',
     'DEFAULT_CONTROLLER_PARAMETERS', 'declare_controller_config',
+    'REQUIRED_CONTROLLER_PARAMETERS',
 ]

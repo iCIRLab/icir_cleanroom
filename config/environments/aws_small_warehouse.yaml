@@ -6,6 +6,10 @@ environment:
 
 gas_environment:
   # 사용 가능 모드: manual, random_after_peak, recurrent_hotspots_after_peak
+  # source_mode: manual
+  # source_enabled: true
+  # source_x: -4.0
+  # source_y: -5.5
   source_mode: random_after_peak
   source_enabled: false
   source_x: 0.0
@@ -20,6 +24,7 @@ gas_environment:
   source_hotspot_centers: [-5.0, -5.0, 5.0, -5.0, -4.0, 6.0, 4.0, 6.0]
   source_hotspot_weights: [0.25, 0.25, 0.25, 0.25]
   source_hotspot_jitter_sigma: 1.0
+  # persist_source_state: false
   persist_source_state: true
   source_state_file: ~/.ros/icir_cleanroom/aws_small_warehouse_gas_source_state.json
   map_min_x: -7.0
@@ -28,7 +33,7 @@ gas_environment:
   map_max_y: 10.0
   ground_truth_resolution: 0.1
   gmrf_resolution: 0.5
-  sampling_clearance: 0.3
+  sampling_clearance: 0.25
   robot_start_x: 0.0
   robot_start_y: 0.0
   log_concentration_min: -4.0

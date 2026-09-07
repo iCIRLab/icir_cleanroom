@@ -71,15 +71,28 @@ class GasMappingControllerNode(Node):
         'event_state', 'snapshot_pending')
     current_event_id = StateField('event_state', 'event_id')
 
-    active_hrs_route = StateField('hrs_state', 'active_route')
+    active_hrs_target = StateField('hrs_state', 'active_target')
+    hrs_route_targets = StateField('hrs_state', 'route_targets')
+    hrs_active_region_cells = StateField(
+        'hrs_state', 'active_region_cells')
+    hrs_completed_region_cells = StateField(
+        'hrs_state', 'completed_region_cells')
+    hrs_region_ascent_floor = StateField(
+        'hrs_state', 'region_ascent_floor')
     hrs_cycles = StateField('hrs_state', 'cycles')
-    hrs_batch_successes = StateField('hrs_state', 'batch_successes')
     hrs_cycle_started_ns = StateField('hrs_state', 'cycle_started_ns')
     hrs_cycles_in_alert = StateField('hrs_state', 'cycles_in_alert')
     failure_counts = StateField('hrs_state', 'failure_counts')
     unreachable_variables = StateField(
         'hrs_state', 'unreachable_variables')
+    hrs_candidate_variables = StateField(
+        'hrs_state', 'candidate_variables')
     hrs_gmrf_dirty = StateField('hrs_state', 'dirty')
+    hrs_confirmed_variable = StateField(
+        'hrs_state', 'confirmed_variable')
+    hrs_confirmed_value = StateField('hrs_state', 'confirmed_value')
+    hrs_confirmed_timestamp = StateField(
+        'hrs_state', 'confirmed_timestamp')
 
     source_transition_reason = StateField(
         'source_transition_state', 'reason')
@@ -160,15 +173,16 @@ class GasMappingControllerNode(Node):
         self.current_index = 0
         self.retry = 0
         self.returning = False
-        self.active_hrs_route = None
+        self.active_hrs_target = None
+        self.hrs_route_targets = []
         self.hrs_cycles = 0
-        self.hrs_batch_successes = 0
         self.hrs_cycle_started_ns = None
         self.hrs_cycles_in_alert = 0
         self.lrs_lap = 0
         self.lap_max_concentration = 0.0
         self.lap_hazard_detected = False
         self.hrs_gmrf_dirty = False
+        self.hrs_candidate_variables = set()
         self.history_snapshot_pending = False
         self.source_advance_future = None
         self.source_advance_timeout_timer = None

@@ -20,7 +20,6 @@ class MappingPhase(str, Enum):
 
 class PlanningKind(str, Enum):
     LRS = 'LRS'
-    HRS = 'HRS'
 
     def __str__(self):
         return self.value
@@ -89,22 +88,38 @@ class LrsRuntimeState:
 
 @dataclass
 class HrsRuntimeState:
-    active_route: object = None
+    active_target: object = None
+    route_targets: list = field(default_factory=list)
+    active_region_cells: Set[tuple] = field(default_factory=set)
+    completed_region_cells: Set[tuple] = field(default_factory=set)
+    region_ascent_floor: Optional[float] = None
     cycles: int = 0
     cycles_in_alert: int = 0
-    batch_successes: int = 0
     cycle_started_ns: Optional[int] = None
     failure_counts: Dict[int, int] = field(default_factory=dict)
     unreachable_variables: Set[int] = field(default_factory=set)
+    candidate_variables: Set[int] = field(default_factory=set)
     dirty: bool = False
+    confirmed_variable: Optional[int] = None
+    confirmed_value: Optional[float] = None
+    confirmed_timestamp: Optional[float] = None
 
     def reset_search(self):
+        self.active_target = None
+        self.route_targets.clear()
+        self.active_region_cells.clear()
+        self.completed_region_cells.clear()
+        self.region_ascent_floor = None
         self.cycles = 0
         self.cycles_in_alert = 0
-        self.batch_successes = 0
+        self.cycle_started_ns = None
         self.failure_counts.clear()
         self.unreachable_variables.clear()
+        self.candidate_variables.clear()
         self.dirty = False
+        self.confirmed_variable = None
+        self.confirmed_value = None
+        self.confirmed_timestamp = None
 
 
 @dataclass

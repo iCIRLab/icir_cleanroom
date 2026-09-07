@@ -15,7 +15,7 @@ ALLOWED_TRANSITIONS = {
         MappingPhase.HRS_PLANNING, MappingPhase.COMPLETE},
     MappingPhase.HRS_PLANNING: {
         MappingPhase.HRS_PLANNING, MappingPhase.HRS_NAVIGATION,
-        MappingPhase.LRS_PLANNING,
+        MappingPhase.SOURCE_TRANSITION, MappingPhase.LRS_PLANNING,
         MappingPhase.COMPLETE},
     MappingPhase.HRS_NAVIGATION: {
         MappingPhase.HRS_NAVIGATION, MappingPhase.HRS_PLANNING,

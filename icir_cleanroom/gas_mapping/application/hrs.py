@@ -1,9 +1,26 @@
-"""HRS runtime-state owner, candidate policy, and exact planning facade."""
+"""HRS runtime state and single-cell DD-UCB candidate selection."""
+
+from dataclasses import dataclass, replace
 import math
 
 from ..models import HrsRuntimeState
-from ..planning.hrs import HrsCell, solve_hrs_p2
-from ..planning.hrs_policy import distance_discounted_ucb
+from ..planning.hrs_policy import distance_aware_scores, normalized_ucb
+
+
+@dataclass(frozen=True)
+class HrsCandidate:
+    variable: int
+    row: int
+    col: int
+    x: float
+    y: float
+    score: float
+    mean: float
+    variance: float
+    ucb: float | None = None
+    distance: float = 0.0
+    normalized_ucb: float = 0.0
+    normalized_distance: float = 0.0
 
 
 class HrsManager:
@@ -12,8 +29,6 @@ class HrsManager:
 
     def reset_search(self):
         self.state.reset_search()
-        self.state.active_route = None
-        self.state.cycle_started_ns = None
 
     def available_variables(
             self, variable_count, sampled_variables, eligible_variables=None):
@@ -34,79 +49,74 @@ class HrsManager:
 
     def record_success(self, variable):
         self.state.failure_counts.pop(int(variable), None)
-        self.state.batch_successes += 1
 
     def build_candidates(
-            self, gmrf, sampled_variables, ucb_coefficient, count,
-            eligible_variables=None, current_xy=None, distance_weight=0.0):
-        distance_weight = float(distance_weight)
-        if not math.isfinite(distance_weight) or distance_weight < 0.0:
-            raise ValueError(
-                'distance_weight must be finite and non-negative')
-
-        if distance_weight > 0.0 and current_xy is None:
-            raise ValueError(
-                'current_xy is required when distance_weight is positive')
-
-        if current_xy is not None:
-            current_x, current_y = (
-                float(current_xy[0]), float(current_xy[1]))
-            if not math.isfinite(current_x) or not math.isfinite(current_y):
-                raise ValueError('current_xy must contain finite coordinates')
-        else:
-            current_x = current_y = 0.0
-
-        distances = []
-        for variable in range(len(gmrf.var_cells)):
-            x, y = gmrf.cell_center(variable)
-            distances.append(
-                math.hypot(x - current_x, y - current_y)
-                if current_xy is not None else 0.0)
-        potentials = distance_discounted_ucb(
-            gmrf.solution, gmrf.variance, distances,
-            float(ucb_coefficient), distance_weight)
+            self, gmrf, sampled_variables, ucb_coefficient,
+            threshold, eligible_variables=None):
+        threshold = float(threshold)
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError('candidate threshold must be in [0, 1]')
+        ucb_values = normalized_ucb(
+            gmrf.solution, gmrf.variance, ucb_coefficient)
 
         candidates = []
-        for variable in self.available_variables(
+        for variable in sorted(self.available_variables(
                 len(gmrf.var_cells), sampled_variables,
-                eligible_variables):
+                eligible_variables)):
+            ucb = float(ucb_values[variable])
+            if ucb < threshold:
+                continue
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
-
-            reward = float(potentials[variable])
-
-            candidates.append(HrsCell(
+            candidates.append(HrsCandidate(
                 variable=variable,
                 row=int(row),
                 col=int(col),
                 x=x,
                 y=y,
-                reward=reward,
+                ucb=ucb,
+                score=ucb,
                 mean=float(gmrf.solution[variable]),
                 variance=float(gmrf.variance[variable])))
 
-        candidates.sort(
-            key=lambda cell: (-cell.reward, cell.row, cell.col))
-        return candidates[:int(count)]
+        candidates.sort(key=lambda cell: (
+            cell.row, cell.col, cell.variable))
+        return tuple(candidates)
 
     @staticmethod
-    def plan_with_fallback(
-            candidates, current_xy, max_visits, hrs_config,
-            dwell_seconds):
-        attempts = []
-        for visit_count in range(int(max_visits), 0, -1):
-            plan = solve_hrs_p2(
-                candidates, current_xy, visit_count=visit_count,
-                speed=float(hrs_config.hrs_speed),
-                update_seconds=float(hrs_config.hrs_update_seconds),
-                dwell_seconds=float(dwell_seconds),
-                combination_time_limit=float(
-                    hrs_config.hrs_combination_time_limit),
-                planner_mode=str(hrs_config.hrs_planner_mode))
-            attempts.append((visit_count, plan))
-            if plan is not None:
-                return plan, attempts
-        return None, attempts
+    def select_candidate(
+            candidates, current_xy, distance_fn, distance_weight):
+        """Score current candidates and select exactly one DD-UCB target."""
+        current = (float(current_xy[0]), float(current_xy[1]))
+        if not all(math.isfinite(value) for value in current):
+            raise ValueError('current_xy must contain finite coordinates')
+        candidates = tuple(candidates)
+        if not candidates:
+            return (), None
+        distances = tuple(float(distance_fn(
+            current, (candidate.x, candidate.y)))
+            for candidate in candidates)
+        scores, normalized_ucb_values, normalized_distances = (
+            distance_aware_scores(
+                [candidate.score if candidate.ucb is None else candidate.ucb
+                 for candidate in candidates], distances,
+                distance_weight))
+        scored = tuple(
+            replace(
+                candidate,
+                ucb=float(
+                    candidate.score if candidate.ucb is None
+                    else candidate.ucb),
+                score=float(scores[index]),
+                distance=float(distances[index]),
+                normalized_ucb=float(normalized_ucb_values[index]),
+                normalized_distance=float(normalized_distances[index]))
+            for index, candidate in enumerate(candidates))
+        selected = min(scored, key=lambda candidate: (
+            -candidate.score,
+            -(candidate.score if candidate.ucb is None else candidate.ucb),
+            candidate.row, candidate.col, candidate.variable))
+        return scored, selected
 
     @staticmethod
     def reached_response_threshold(value, threshold):
@@ -119,4 +129,4 @@ class HrsManager:
         return value >= threshold
 
 
-__all__ = ['HrsManager']
+__all__ = ['HrsCandidate', 'HrsManager']

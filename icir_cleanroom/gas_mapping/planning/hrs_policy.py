@@ -1,42 +1,65 @@
-"""Pure HRS UCB and distance-discount policies."""
-
-import math
+"""Pure HRS UCB filtering and distance-aware score policies."""
 
 import numpy as np
+
+
+def _validated_fields(mean, variance):
+    mean_values = np.asarray(mean, dtype=float)
+    variance_values = np.asarray(variance, dtype=float)
+    if mean_values.shape != variance_values.shape:
+        raise ValueError('mean and variance shapes must match')
+    if np.any(~np.isfinite(mean_values)):
+        raise ValueError('mean must be finite')
+    if np.any(~np.isfinite(variance_values)):
+        raise ValueError('variance must be finite')
+    if np.any(variance_values < -1.0e-12):
+        raise ValueError('variance must be non-negative')
+    return mean_values, variance_values
 
 
 def normalized_ucb(mean, variance, coefficient=1.0):
     """Return a normalized concentration upper-confidence potential."""
     coefficient = float(coefficient)
-    if coefficient < 0.0:
-        raise ValueError('UCB coefficient must be non-negative')
-    mean_values = np.asarray(mean, dtype=float)
-    variance_values = np.asarray(variance, dtype=float)
-    if mean_values.shape != variance_values.shape:
-        raise ValueError('mean and variance shapes must match')
-    if np.any(variance_values < -1.0e-12):
-        raise ValueError('variance must be non-negative')
+    if not np.isfinite(coefficient) or coefficient < 0.0:
+        raise ValueError('UCB coefficient must be finite and non-negative')
+    mean_values, variance_values = _validated_fields(mean, variance)
     return np.clip(
         mean_values + coefficient * np.sqrt(np.maximum(variance_values, 0.0)),
         0.0, 1.0)
 
 
-def distance_discounted_ucb(
-        mean, variance, distances, coefficient=1.0, distance_weight=0.0):
-    """Return UCB discounted by metric distance from the current pose."""
-    weight = float(distance_weight)
-    if not math.isfinite(weight) or weight < 0.0:
-        raise ValueError('distance weight must be finite and non-negative')
+def _minmax(values, constant_value):
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
+        return values.copy()
+    span = float(np.max(values) - np.min(values))
+    if span <= np.finfo(float).eps:
+        return np.full(values.shape, float(constant_value), dtype=float)
+    return (values - np.min(values)) / span
+
+
+def distance_aware_scores(ucb, distances, distance_weight):
+    """Normalize candidate-only UCB/distance and return DD-UCB scores."""
+    ucb_values = np.asarray(ucb, dtype=float)
     distance_values = np.asarray(distances, dtype=float)
-    potentials = normalized_ucb(mean, variance, coefficient)
-    if distance_values.shape != potentials.shape:
-        raise ValueError('distances and UCB values must have matching shapes')
+    if ucb_values.shape != distance_values.shape:
+        raise ValueError('UCB and distance shapes must match')
+    if np.any(~np.isfinite(ucb_values)):
+        raise ValueError('UCB values must be finite')
     if (np.any(~np.isfinite(distance_values)) or
             np.any(distance_values < 0.0)):
         raise ValueError('distances must be finite and non-negative')
-    return potentials / (1.0 + weight * distance_values)
+    weight = float(distance_weight)
+    if not np.isfinite(weight) or weight < 0.0:
+        raise ValueError(
+            'distance weight must be finite and non-negative')
+
+    normalized_ucb_values = _minmax(ucb_values, constant_value=1.0)
+    normalized_distances = _minmax(distance_values, constant_value=0.0)
+    scores = normalized_ucb_values - weight * normalized_distances
+    return scores, normalized_ucb_values, normalized_distances
 
 
 __all__ = [
-    'distance_discounted_ucb', 'normalized_ucb',
+    'distance_aware_scores', 'normalized_ucb',
 ]

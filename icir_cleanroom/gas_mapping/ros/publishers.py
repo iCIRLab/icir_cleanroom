@@ -12,7 +12,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from ..mapping.field_projection import (
     logarithmic_display as transform_logarithmic_display, project_field)
-from ..planning.hrs_policy import distance_discounted_ucb, normalized_ucb
+from ..planning.hrs_policy import normalized_ucb
 
 
 PUBLISHER_SPECS = (
@@ -22,10 +22,7 @@ PUBLISHER_SPECS = (
     ('estimate_labels_pub', MarkerArray, '/gas_mapping/estimate_labels'),
     ('variance_labels_pub', MarkerArray, '/gas_mapping/variance_labels'),
     ('ucb_pub', OccupancyGrid, '/gas_mapping/hrs/ucb'),
-    ('dd_ucb_pub', OccupancyGrid, '/gas_mapping/hrs/dd_ucb'),
     ('ucb_labels_pub', MarkerArray, '/gas_mapping/hrs/ucb_labels'),
-    ('dd_ucb_labels_pub', MarkerArray,
-     '/gas_mapping/hrs/dd_ucb_labels'),
     ('measurement_grid_pub', OccupancyGrid,
      '/gas_mapping/measurements/grid'),
     ('measurement_labels_pub', MarkerArray,
@@ -97,7 +94,7 @@ class ControllerVisualization:
 
     METHODS = (
         'clear_hrs_candidates', 'display_field', 'occupancy_grid',
-        'publish_maps', 'publish_ucb', 'publish_dd_ucb',
+        'publish_maps', 'publish_ucb',
         'logarithmic_display',
         'publish_measurements',
         'publish_lrs_active_route', 'publish_lrs_reward',
@@ -153,7 +150,6 @@ class ControllerVisualization:
             self.controller.gmrf.variance,
             'gas_mapping_variance_values', (0.0, 1.0, 1.0)))
         self.publish_ucb()
-        self.publish_dd_ucb()
 
     def field_value_labels(self, values, namespace, color):
         array = MarkerArray()
@@ -194,31 +190,6 @@ class ControllerVisualization:
             self.controller.occupancy_grid(template, values, free))
         self.controller.ucb_labels_pub.publish(self.field_value_labels(
             ucb, 'gas_mapping_hrs_ucb_values', (1.0, 1.0, 1.0)))
-
-    def publish_dd_ucb(self, current_xy=None):
-        if self.controller.gmrf is None:
-            return
-        if current_xy is None:
-            if self.controller.latest_pose is None:
-                return
-            current_xy = (
-                self.controller.latest_pose.pose.position.x,
-                self.controller.latest_pose.pose.position.y)
-        distances = np.asarray([
-            math.hypot(x - float(current_xy[0]), y - float(current_xy[1]))
-            for x, y in (
-                self.controller.gmrf.cell_center(variable)
-                for variable in range(len(self.controller.gmrf.var_cells)))
-        ], dtype=float)
-        dd_ucb = distance_discounted_ucb(
-            self.controller.gmrf.solution, self.controller.gmrf.variance,
-            distances, float(self.controller.hrs_ucb_k),
-            float(self.controller.hrs_distance_weight))
-        template, values, free = self.controller.display_field(dd_ucb)
-        self.controller.dd_ucb_pub.publish(
-            self.controller.occupancy_grid(template, values, free))
-        self.controller.dd_ucb_labels_pub.publish(self.field_value_labels(
-            dd_ucb, 'gas_mapping_hrs_dd_ucb_values', (1.0, 1.0, 0.0)))
 
     def logarithmic_display(self, values):
         return transform_logarithmic_display(
@@ -413,7 +384,8 @@ class ControllerVisualization:
                              for value in self.controller.lrs_status_values]
         self.controller.lrs_status_log_pub.publish(log_marker)
 
-    def publish_candidates(self, candidates):
+    def publish_candidates(
+            self, candidates, representatives=(), selected=None):
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.controller.get_clock().now().to_msg()
@@ -422,13 +394,24 @@ class ControllerVisualization:
         marker.type = Marker.POINTS
         marker.action = Marker.ADD
         marker.scale.x = marker.scale.y = 0.35
-        marker.points = [Point(x=cell.x, y=cell.y, z=0.14)
-                         for cell in candidates]
-        marker.colors = [ColorRGBA(r=1.0, g=0.8, b=0.0, a=1.0)
-                         for _ in candidates]
+        target_variable = (
+            None if selected is None else selected.variable)
+        representative_variables = {
+            candidate.variable for candidate in representatives}
+        for cell in candidates:
+            marker.points.append(Point(x=cell.x, y=cell.y, z=0.14))
+            if cell.variable == target_variable:
+                marker.colors.append(ColorRGBA(
+                    r=0.0, g=1.0, b=0.2, a=1.0))
+            elif cell.variable in representative_variables:
+                marker.colors.append(ColorRGBA(
+                    r=0.0, g=0.85, b=1.0, a=1.0))
+            else:
+                marker.colors.append(ColorRGBA(
+                    r=1.0, g=0.8, b=0.0, a=1.0))
         self.controller.hrs_candidates_pub.publish(marker)
 
-    def publish_hrs_route(self, plan):
+    def publish_hrs_route(self, targets):
         path = Path()
         path.header.frame_id = 'map'
         path.header.stamp = self.controller.get_clock().now().to_msg()
@@ -436,11 +419,13 @@ class ControllerVisualization:
             start = copy.deepcopy(self.controller.latest_pose)
             start.header = path.header
             path.poses.append(start)
-        for cell in plan.cells:
+        if hasattr(targets, 'variable'):
+            targets = (targets,)
+        for target in targets:
             pose = PoseStamped()
             pose.header = path.header
-            pose.pose.position.x = cell.x
-            pose.pose.position.y = cell.y
+            pose.pose.position.x = target.x
+            pose.pose.position.y = target.y
             pose.pose.orientation.w = 1.0
             path.poses.append(pose)
         self.controller.hrs_route_pub.publish(path)

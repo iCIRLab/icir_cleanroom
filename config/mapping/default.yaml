@@ -20,14 +20,8 @@ gas_mapping_controller_node:
     gabp_cg_warning_tolerance: 1.0e-4
     hrs_ucb_k: 0.2
     hrs_distance_weight: 0.03
-    hrs_response_threshold: 0.50
-    hrs_max_cycles_per_alert: 10
-    hrs_candidate_count: 1
-    hrs_visit_count: 1
-    hrs_speed: 5.0
-    hrs_update_seconds: 50.0
-    hrs_combination_time_limit: 5.0
-    hrs_planner_mode: reward_ordered_exact
+    hrs_response_threshold: 0.98
+    hrs_max_cycles_per_alert: 15
     hazard_threshold: 0.15
     history_top_k: 3
     history_merge_radius: 5.0

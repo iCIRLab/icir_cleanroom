@@ -1,1 +1,1 @@
-"""Pure LRS and HRS route-planning algorithms."""
+"""Pure LRS route-planning and HRS score policies."""

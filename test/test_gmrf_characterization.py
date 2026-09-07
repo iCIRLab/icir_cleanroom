@@ -4,7 +4,7 @@ import numpy as np
 
 from icir_cleanroom.gas_mapping.mapping.gmrf import GmrfGrid
 from icir_cleanroom.gas_mapping.planning.hrs_policy import (
-    distance_discounted_ucb, normalized_ucb)
+    distance_aware_scores, normalized_ucb)
 
 
 def test_observation_replaces_nearest_cell_and_reset_restores_prior(
@@ -54,12 +54,13 @@ def test_normalized_ucb_is_preserved():
         [0.4, 0.95])
 
 
-def test_distance_discounted_ucb_matches_hrs_candidate_score():
-    np.testing.assert_allclose(
-        distance_discounted_ucb(
-            [0.5, 0.6], [0.0, 0.0], [0.0, 2.0],
-            coefficient=0.0, distance_weight=0.5),
-        [0.5, 0.3])
+def test_distance_aware_scores_normalize_ucb_and_distance_separately():
+    scores, ucb, distance = distance_aware_scores(
+        [0.6, 0.8], [1.0, 5.0], distance_weight=0.5)
+
+    np.testing.assert_allclose(ucb, [0.0, 1.0])
+    np.testing.assert_allclose(distance, [0.0, 1.0])
+    np.testing.assert_allclose(scores, [0.0, 0.5])
 
 
 def test_gmrf_variable_and_directed_message_order(map_message_factory):

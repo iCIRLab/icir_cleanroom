@@ -12,6 +12,7 @@ from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from icir_cleanroom.gas_mapping.navigation_profile import (
     load_navigation_settings, navigation_goal_clearance, render_robot_sdf)
@@ -121,6 +122,11 @@ def launch_setup(context):
     })
     controller_parameters = dict(mapping_params)
     controller_parameters['use_sim_time'] = use_sim_time
+    controller_parameters.update({
+        'hrs_candidate_threshold': ParameterValue(
+            LaunchConfiguration('hrs_candidate_threshold'),
+            value_type=float),
+    })
     model_path = os.path.join(
         package_dir, 'models', 'aws_small_warehouse')
     gazebo_model_path = model_path
@@ -198,5 +204,8 @@ def generate_launch_description():
         DeclareLaunchArgument('environment', default_value='empty_50m'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument(
+            'hrs_candidate_threshold',
+            description='Required HRS posterior-score candidate threshold'),
         OpaqueFunction(function=launch_setup),
     ])

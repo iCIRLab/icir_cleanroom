@@ -9,7 +9,8 @@ import pytest
 import yaml
 from PIL import Image
 
-from icir_cleanroom.gas_mapping.application.hrs import HrsManager
+from icir_cleanroom.gas_mapping.application.hrs import (
+    HrsCandidate, HrsManager)
 from icir_cleanroom.gas_mapping.environment import (
     random_source_is_lrs_detectable)
 from icir_cleanroom.gas_mapping.mapping.domains import (
@@ -22,6 +23,7 @@ from icir_cleanroom.gas_mapping.mapping.lrs_representatives import (
     build_lrs_representatives)
 from icir_cleanroom.gas_mapping.mapping.path_distance import (
     SamplingDistanceOracle)
+from icir_cleanroom.gas_mapping.models import HrsRuntimeState
 from icir_cleanroom.gas_mapping.ros.lrs_planner_node import (
     LrsPathPlannerNode)
 
@@ -292,38 +294,90 @@ def test_hrs_candidates_are_restricted_without_removing_field_variables(
     gmrf.solution[:] = [0.1, 0.9, 0.2]
     manager = HrsManager()
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=3,
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.15,
         eligible_variables={0, 2})
-    assert [candidate.variable for candidate in candidates] == [2, 0]
+    assert [candidate.variable for candidate in candidates] == [2]
     assert len(gmrf.var_cells) == 3
 
 
-def test_hrs_candidates_prefer_nearer_cells_when_ucb_is_tied(
+def test_hrs_candidate_threshold_is_inclusive_and_has_no_top_n_limit(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.5, 0.5, 0.5]
+    gmrf.solution[:] = [0.49, 0.5, 0.8]
     gmrf.variance[:] = [0.0, 0.0, 0.0]
     manager = HrsManager()
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=3,
-        current_xy=(0.5, 0.5), distance_weight=0.5)
-    assert [candidate.variable for candidate in candidates] == [0, 1, 2]
-    assert candidates[0].x == 0.5
-    assert candidates[0].y == 0.5
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.5)
+    assert [candidate.variable for candidate in candidates] == [1, 2]
 
 
-def test_hrs_candidate_limit_selects_only_the_highest_distance_discounted_ucb(
+def test_hrs_distance_aware_score_selects_exactly_one_candidate(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.5, 0.6, 0.7]
-    gmrf.variance[:] = [0.0, 0.0, 0.0]
+    gmrf.solution[:] = [0.8, 0.6, 0.3]
+    gmrf.variance[:] = 0.0
     manager = HrsManager()
+    candidates = manager.build_candidates(
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.5)
+
+    scored, selected = manager.select_candidate(
+        candidates, current_xy=(1.5, 0.5),
+        distance_fn=lambda first, second: math.dist(first, second),
+        distance_weight=2.0)
+
+    assert [candidate.variable for candidate in scored] == [0, 1]
+    assert selected.variable == 1
+
+
+def test_hrs_candidates_exclude_sampled_unreachable_and_ineligible_cells(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=4, height=1))
+    gmrf.solution[:] = 0.8
+    manager = HrsManager(HrsRuntimeState(unreachable_variables={2}))
 
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=1,
-        current_xy=(0.5, 0.5), distance_weight=1.0)
+        gmrf, sampled_variables={1}, ucb_coefficient=0.2, threshold=0.5,
+        eligible_variables={0, 1, 2})
 
     assert [candidate.variable for candidate in candidates] == [0]
+
+
+def test_hrs_target_uses_obstacle_aware_sampling_distance(
+        map_message_factory):
+    map_msg = map_message_factory(width=5, height=5)
+    gmrf = GmrfGrid(map_msg)
+    across_wall = 2 * 5 + 3
+    same_side = 4 * 5
+    gmrf.solution[across_wall] = 0.9
+    gmrf.solution[same_side] = 0.7
+    free = np.ones((5, 5), dtype=bool)
+    free[:4, 2] = False
+    distance = SamplingDistanceOracle(
+        GridGeometry.from_message(map_msg), free)
+
+    candidates = HrsManager().build_candidates(
+        gmrf, sampled_variables=set(), ucb_coefficient=0.2, threshold=0.5,
+        eligible_variables={across_wall, same_side})
+    _, selected = HrsManager.select_candidate(
+        candidates, current_xy=(1.5, 2.5),
+        distance_fn=distance.distance, distance_weight=2.0)
+
+    assert selected.variable == same_side
+
+
+def test_hrs_candidate_route_distance_tie_uses_stable_cell_order(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=2, height=1))
+    gmrf.solution[:] = [0.7, 0.7]
+
+    candidates = HrsManager().build_candidates(
+        gmrf, sampled_variables=set(), ucb_coefficient=0.2, threshold=0.5)
+    _, selected = HrsManager.select_candidate(
+        candidates, current_xy=(1.0, 0.5),
+        distance_fn=lambda first, second: math.dist(first, second),
+        distance_weight=1.0)
+
+    assert selected.variable == 0
 
 
 def test_source_detectability_uses_accessible_sampling_points_only():

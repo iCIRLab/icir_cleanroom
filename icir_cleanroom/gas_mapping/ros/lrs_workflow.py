@@ -171,7 +171,7 @@ class LrsWorkflow:
         self.controller.get_logger().info(
             f'=== LRS lap {self.controller.lrs_lap} 완료: '
             f'max={self.controller.lap_max_concentration:.4f}, '
-            f'threshold={float(self.controller.hazard_threshold):.4f}, '
+            f'T_trigger={float(self.controller.hazard_threshold):.4f}, '
             f'hazard={self.controller.lap_hazard_detected} ===')
         if self.controller.lap_hazard_detected:
             self.controller.persist_history('hazardous LRS measurements')

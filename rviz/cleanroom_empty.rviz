@@ -100,17 +100,6 @@ Visualization Manager:
       Enabled: false
       Name: HRSPotentialUCBValues
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/ucb_labels}
-    - Alpha: 0.62
-      Class: rviz_default_plugins/Map
-      Color Scheme: costmap
-      Draw Behind: false
-      Enabled: false
-      Name: HRSPotentialDDUCB
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dd_ucb}
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: false
-      Name: HRSPotentialDDUCBValues
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dd_ucb_labels}
     - Alpha: 0.55
       Class: rviz_default_plugins/Map
       Color Scheme: costmap

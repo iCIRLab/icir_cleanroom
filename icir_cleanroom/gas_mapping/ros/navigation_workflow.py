@@ -20,9 +20,8 @@ class NavigationWorkflow:
             if self.controller.current_index < len(self.controller.lrs_goals):
                 return self.controller.lrs_goals[self.controller.current_index]
         if (self.controller.phase == 'HRS_NAVIGATION' and
-                self.controller.active_hrs_route is not None and
-                self.controller.current_index < len(self.controller.active_hrs_route.cells)):
-            cell = self.controller.active_hrs_route.cells[self.controller.current_index]
+                self.controller.active_hrs_target is not None):
+            cell = self.controller.active_hrs_target
             target = PoseStamped()
             target.header.frame_id = 'map'
             target.pose.position.x = cell.x
@@ -50,7 +49,7 @@ class NavigationWorkflow:
             label = (
                 f'HRS cycle {self.controller.hrs_cycles + 1} '
                 f'[{self.controller.current_index + 1}/'
-                f'{len(self.controller.active_hrs_route.cells)}]')
+                f'{len(self.controller.hrs_route_targets)}]')
         self.controller.get_logger().info(
             f'{label} -> ({target.pose.position.x:.2f}, '
             f'{target.pose.position.y:.2f})')
@@ -64,13 +63,6 @@ class NavigationWorkflow:
         if self.controller.phase == 'LRS' and not self.controller.returning and self.controller.lrs_goals:
             following = self.controller.lrs_goals[
                 (self.controller.current_index + 1) % len(self.controller.lrs_goals)]
-        elif (self.controller.phase == 'HRS_NAVIGATION' and
-              self.controller.active_hrs_route and
-              self.controller.current_index + 1 < len(self.controller.active_hrs_route.cells)):
-            cell = self.controller.active_hrs_route.cells[self.controller.current_index + 1]
-            following = PoseStamped()
-            following.pose.position.x = cell.x
-            following.pose.position.y = cell.y
         pose = copy.deepcopy(target.pose.orientation)
         if following is None:
             pose.w = 1.0
@@ -90,9 +82,8 @@ class NavigationWorkflow:
             return
         target_variable = None
         if (self.controller.phase == 'HRS_NAVIGATION' and
-                self.controller.active_hrs_route is not None):
-            target_variable = int(
-                self.controller.active_hrs_route.cells[self.controller.current_index].variable)
+                self.controller.active_hrs_target is not None):
+            target_variable = int(self.controller.active_hrs_target.variable)
         dwell_generation = self.controller.measurement_manager.start(
             copy.deepcopy(self.controller.latest_pose), self.controller.phase, target_variable)
         dwell = (self.controller.lrs_dwell_seconds if self.controller.phase == 'LRS'
@@ -139,13 +130,14 @@ class NavigationWorkflow:
                 if first_hazard:
                     self.controller.get_logger().warning(
                         f'위험 가스 감지: value={value:.4f} >= '
+                        f'T_trigger='
                         f'{float(self.controller.hazard_threshold):.4f}; '
                         '현재 LRS 순찰 완료 후 HRS로 전환합니다')
                 if self.controller.lap_hazard_detected:
                     self.controller.hazard_pub.publish(Bool(data=True))
                 self.controller.update_gmrf('LRS measurement')
             else:
-                planned = self.controller.active_hrs_route.cells[self.controller.current_index]
+                planned = self.controller.active_hrs_target
                 if variable == planned.variable:
                     self.controller.hrs_manager.record_success(planned.variable)
                 else:
@@ -157,14 +149,19 @@ class NavigationWorkflow:
                 self.controller.hrs_gmrf_dirty = True
                 if self.controller.update_gmrf(
                         f'{self.controller.phase} measurement '
-                        f'[{self.controller.current_index + 1}/'
-                        f'{len(self.controller.active_hrs_route.cells)}]',
+                        f'at variable {planned.variable}',
                         compare_with_cg=False):
                     self.controller.hrs_gmrf_dirty = False
                 else:
                     self.controller.get_logger().warning(
                         'HRS 지점별 GaBP 갱신을 다음 측정 또는 '
                         '배치 종료 시 재시도합니다')
+                self.controller.get_logger().info(
+                    f'HRS actual measurement: target_variable='
+                    f'{planned.variable}, measured_variable={variable}, '
+                    f'value={value:.6f}, '
+                    f'T_goal_concentration='
+                    f'{float(self.controller.hrs_response_threshold):.6f}')
             self.controller.publish_measurements()
             self.controller.get_logger().info(
                 f'측정 완료: phase={self.controller.phase}, '
@@ -196,7 +193,7 @@ class NavigationWorkflow:
         self.controller.advance_after_target()
 
     def record_hrs_failure(self):
-        cell = self.controller.active_hrs_route.cells[self.controller.current_index]
+        cell = self.controller.active_hrs_target
         count, unreachable = self.controller.hrs_manager.record_failure(
             cell.variable, self.controller.max_cell_failures)
         if unreachable:
@@ -213,7 +210,7 @@ class NavigationWorkflow:
             self.controller.send_current_goal()
         elif self.controller.phase == 'HRS_NAVIGATION':
             self.controller.publish_hrs_status()
-            self.controller.send_current_goal()
+            self.controller.finish_hrs_cycle()
 
 
 __all__ = ['NavigationWorkflow']

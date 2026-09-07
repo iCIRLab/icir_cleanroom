@@ -7,7 +7,10 @@ import yaml
 from builtin_interfaces.msg import Time
 from visualization_msgs.msg import Marker
 
-from icir_cleanroom.gas_mapping.config import DEFAULT_CONTROLLER_PARAMETERS
+from icir_cleanroom.gas_mapping.application.hrs import (
+    HrsCandidate)
+from icir_cleanroom.gas_mapping.config import (
+    DEFAULT_CONTROLLER_PARAMETERS, REQUIRED_CONTROLLER_PARAMETERS)
 from icir_cleanroom.gas_mapping.mapping.kmeans_partition import (
     ClusterCell, KMeansPartition)
 from icir_cleanroom.gas_mapping.ros.lrs_planner_node import (
@@ -34,8 +37,9 @@ def test_manifest_matches_controller_publishers_and_parameter_count():
     expected_topics = set(manifest['topics']['controller']['publishers'])
     actual_topics = {topic for _, _, topic in PUBLISHER_SPECS}
     assert actual_topics == expected_topics
-    assert len(PUBLISHER_SPECS) == 30
-    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 44
+    assert len(PUBLISHER_SPECS) == 28
+    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 38
+    assert REQUIRED_CONTROLLER_PARAMETERS == ('hrs_candidate_threshold',)
 
 
 def test_scripts_are_logic_free_compatible_entrypoints():
@@ -46,6 +50,26 @@ def test_scripts_are_logic_free_compatible_entrypoints():
             encoding='utf-8')
         assert 'def ' not in source
         assert 'from icir_cleanroom.gas_mapping.ros.' in source
+
+
+def test_all_mapping_launch_entrypoints_require_candidate_threshold():
+    for launch_file in (
+            'gas_mapping.launch.py', 'empty_50m.launch.py',
+            'aws_small_warehouse.launch.py', 'cleanroom_empty.launch.py'):
+        source = (PACKAGE_ROOT / 'launch' / launch_file).read_text(
+            encoding='utf-8')
+        assert "'hrs_candidate_threshold'" in source
+        assert 'DeclareLaunchArgument' in source
+
+
+def test_hrs_runtime_has_no_kmeans_or_lrs_cluster_dependency():
+    for relative in (
+            'icir_cleanroom/gas_mapping/application/hrs.py',
+            'icir_cleanroom/gas_mapping/ros/hrs_workflow.py',
+            'icir_cleanroom/gas_mapping/ros/controller_node.py'):
+        source = (PACKAGE_ROOT / relative).read_text(encoding='utf-8').lower()
+        assert 'kmeans' not in source
+        assert 'cluster_by_variable' not in source
 
 
 def test_hrs_marker_keeps_each_point_aligned_with_one_color():
@@ -105,6 +129,28 @@ def test_field_value_labels_show_one_numeric_value_per_gmrf_cell():
     assert sparse_labels.markers[0].text == '0.420'
 
 
+def test_hrs_candidate_marker_highlights_representatives_and_target():
+    captured = CapturePublisher()
+    clock = SimpleNamespace(now=lambda: SimpleNamespace(
+        to_msg=lambda: Time()))
+    candidates = tuple(HrsCandidate(
+        variable=index, row=0, col=index, x=float(index), y=0.0,
+        score=0.8 - index * 0.1,
+        mean=0.5, variance=0.1)
+        for index in range(3))
+    visualization = ControllerVisualization(SimpleNamespace(
+        hrs_candidates_pub=captured, get_clock=lambda: clock))
+
+    visualization.publish_candidates(
+        candidates, (candidates[0], candidates[1]), candidates[1])
+
+    colors = captured.message.colors
+    assert len(captured.message.points) == len(colors) == 3
+    assert (colors[0].g, colors[0].b) == (0.85, 1.0)
+    assert (colors[1].r, colors[1].g) == (0.0, 1.0)
+    assert (colors[2].r, colors[2].g) == (1.0, 0.8)
+
+
 def test_ucb_rviz_maps_and_value_labels_are_disabled_by_default():
     config = yaml.safe_load(
         (PACKAGE_ROOT / 'rviz' / 'cleanroom_empty.rviz').read_text(
@@ -120,8 +166,6 @@ def test_ucb_rviz_maps_and_value_labels_are_disabled_by_default():
         'MeasuredGasValues': '/gas_mapping/measurements/value_labels',
         'HRSPotentialUCB': '/gas_mapping/hrs/ucb',
         'HRSPotentialUCBValues': '/gas_mapping/hrs/ucb_labels',
-        'HRSPotentialDDUCB': '/gas_mapping/hrs/dd_ucb',
-        'HRSPotentialDDUCBValues': '/gas_mapping/hrs/dd_ucb_labels',
     }
     for name, topic in expected.items():
         assert displays[name]['Enabled'] is False

@@ -81,12 +81,12 @@ def test_aws_profile_applies_safe_motion_and_keeps_common_nav2_settings():
     assert local['robot_radius'] == 0.22
     assert local['plugins'] == [
         'static_layer', 'voxel_layer', 'inflation_layer']
-    assert local['inflation_layer']['inflation_radius'] == 0.45
-    assert local['inflation_layer']['cost_scaling_factor'] == 5.0
+    assert local['inflation_layer']['inflation_radius'] == 0.3
+    assert local['inflation_layer']['cost_scaling_factor'] == 8.0
     assert global_params['update_frequency'] == 1.0
-    assert global_params['inflation_layer']['inflation_radius'] == 0.45
-    assert global_params['inflation_layer']['cost_scaling_factor'] == 5.0
-    assert navigation_goal_clearance(config) == 0.45
+    assert global_params['inflation_layer']['inflation_radius'] == 0.3
+    assert global_params['inflation_layer']['cost_scaling_factor'] == 8.0
+    assert navigation_goal_clearance(config) == 0.3
 
 
 def test_aws_profile_enables_dwb_diagnostics_only_for_warehouse():
