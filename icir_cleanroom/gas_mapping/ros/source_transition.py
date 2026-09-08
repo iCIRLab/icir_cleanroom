@@ -21,9 +21,10 @@ class SourceTransitionWorkflow:
             f'HRS 대응 임계값 검출 후 가스원 전환: {reason}')
         self.controller.commit_history_snapshot(
             f'confirmed hazard event ending after LRS lap {self.controller.lrs_lap}')
-        self.controller.active_hrs_route = None
+        self.controller.active_hrs_target = None
+        self.controller.hrs_centroid = None
         self.controller.publish_empty_hrs_route()
-        self.controller.clear_hrs_candidates()
+        self.controller.clear_hrs_centroid()
         transition_generation = self.controller.orchestrator.begin_source_transition(
             reason)
         self.controller.publish_phase('SOURCE_TRANSITION')
@@ -138,9 +139,10 @@ class SourceTransitionWorkflow:
         self.controller.get_logger().info(f'HRS 종료 후 LRS 복귀: {reason}')
         self.controller.commit_history_snapshot(
             f'hazard event ending after LRS lap {self.controller.lrs_lap}')
-        self.controller.active_hrs_route = None
+        self.controller.active_hrs_target = None
+        self.controller.hrs_centroid = None
         self.controller.publish_empty_hrs_route()
-        self.controller.clear_hrs_candidates()
+        self.controller.clear_hrs_centroid()
 
         self.controller.start_lrs_lap(reason)
 

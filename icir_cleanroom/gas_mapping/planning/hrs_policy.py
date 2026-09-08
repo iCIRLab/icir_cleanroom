@@ -1,42 +1,38 @@
-"""Pure HRS UCB and distance-discount policies."""
+"""Pure GMRF weighted-centroid policies for HRS target selection."""
 
 import math
 
 import numpy as np
 
 
-def normalized_ucb(mean, variance, coefficient=1.0):
-    """Return a normalized concentration upper-confidence potential."""
-    coefficient = float(coefficient)
-    if coefficient < 0.0:
-        raise ValueError('UCB coefficient must be non-negative')
-    mean_values = np.asarray(mean, dtype=float)
-    variance_values = np.asarray(variance, dtype=float)
-    if mean_values.shape != variance_values.shape:
-        raise ValueError('mean and variance shapes must match')
-    if np.any(variance_values < -1.0e-12):
-        raise ValueError('variance must be non-negative')
-    return np.clip(
-        mean_values + coefficient * np.sqrt(np.maximum(variance_values, 0.0)),
-        0.0, 1.0)
+def concentration_weights(mean, threshold):
+    """Return threshold-excess weights ``max(mean - threshold, 0)``."""
+    threshold = float(threshold)
+    if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+        raise ValueError('centroid threshold must be finite and in [0, 1]')
+    values = np.asarray(mean, dtype=float)
+    if np.any(~np.isfinite(values)):
+        raise ValueError('GMRF mean must be finite')
+    return np.maximum(values - threshold, 0.0)
 
 
-def distance_discounted_ucb(
-        mean, variance, distances, coefficient=1.0, distance_weight=0.0):
-    """Return UCB discounted by metric distance from the current pose."""
-    weight = float(distance_weight)
-    if not math.isfinite(weight) or weight < 0.0:
-        raise ValueError('distance weight must be finite and non-negative')
-    distance_values = np.asarray(distances, dtype=float)
-    potentials = normalized_ucb(mean, variance, coefficient)
-    if distance_values.shape != potentials.shape:
-        raise ValueError('distances and UCB values must have matching shapes')
-    if (np.any(~np.isfinite(distance_values)) or
-            np.any(distance_values < 0.0)):
-        raise ValueError('distances must be finite and non-negative')
-    return potentials / (1.0 + weight * distance_values)
+def weighted_centroid(positions, weights):
+    """Return the weighted x/y centroid, or ``None`` for zero total mass."""
+    points = np.asarray(positions, dtype=float)
+    values = np.asarray(weights, dtype=float)
+    if points.ndim != 2 or points.shape[1:] != (2,):
+        raise ValueError('positions must have shape (N, 2)')
+    if values.shape != (points.shape[0],):
+        raise ValueError('weights must have shape (N,)')
+    if np.any(~np.isfinite(points)) or np.any(~np.isfinite(values)):
+        raise ValueError('positions and weights must be finite')
+    if np.any(values < 0.0):
+        raise ValueError('weights must be non-negative')
+    total = float(np.sum(values))
+    if total <= np.finfo(float).eps:
+        return None
+    centroid = np.sum(points * values[:, None], axis=0) / total
+    return float(centroid[0]), float(centroid[1])
 
 
-__all__ = [
-    'distance_discounted_ucb', 'normalized_ucb',
-]
+__all__ = ['concentration_weights', 'weighted_centroid']

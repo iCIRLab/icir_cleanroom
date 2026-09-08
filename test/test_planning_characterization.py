@@ -1,17 +1,17 @@
-"""Lock down deterministic exact-path and LRS/HRS planning behavior."""
+"""Lock down deterministic exact-path and LRS planning behavior."""
 
 import math
+from types import SimpleNamespace
 
 from icir_cleanroom.gas_mapping.planning.exact_path import (
     solve_held_karp_free_end_path, solve_held_karp_open_path)
-from icir_cleanroom.gas_mapping.planning.hrs import HrsCell, solve_hrs_p2
 from icir_cleanroom.gas_mapping.planning.lrs_priority import (
     LrsRewardPoint, history_adjusted_cycle, solve_lrs_priority_route)
 from icir_cleanroom.gas_mapping.planning.lrs_tsp import LrsPoint, solve_lrs_tsp
 
 
 def hrs_cell(variable, row, col, reward):
-    return HrsCell(
+    return SimpleNamespace(
         variable=variable, row=row, col=col, x=float(col), y=float(row),
         reward=reward, mean=reward, variance=0.1)
 
@@ -27,31 +27,6 @@ def test_held_karp_paths_preserve_order_and_length():
     assert math.isclose(free_length, 3.0)
     assert [cell.variable for cell in open_order] == [2, 0, 1]
     assert math.isclose(open_length, 2.0 + math.sqrt(2.0))
-
-
-def test_hrs_reward_ordered_exact_selects_best_feasible_set():
-    candidates = [
-        hrs_cell(0, 0, 1, 0.9), hrs_cell(1, 1, 1, 0.8),
-        hrs_cell(2, 1, 0, 0.1)]
-    result = solve_hrs_p2(
-        candidates, (0.0, 0.0), visit_count=2, speed=5.0,
-        update_seconds=50.0, dwell_seconds=2.0)
-
-    assert result.solver == 'HELD_KARP'
-    assert math.isclose(result.reward, 1.7)
-    assert {cell.variable for cell in result.cells} == {0, 1}
-
-
-def test_hrs_reward_ordered_exact_supports_a_single_cell_route():
-    candidate = hrs_cell(7, 2, 3, 0.8)
-
-    result = solve_hrs_p2(
-        [candidate], (0.0, 0.0), visit_count=1, speed=5.0,
-        update_seconds=50.0, dwell_seconds=2.0)
-
-    assert result.visit_count == 1
-    assert [cell.variable for cell in result.cells] == [7]
-    assert math.isclose(result.reward, 0.8)
 
 
 def test_lrs_priority_preserves_complete_coverage():

@@ -286,44 +286,74 @@ def test_empty_navigation_goal_domain_preserves_36_lrs_points(
     assert not selection.omitted_cluster_ids
 
 
-def test_hrs_candidates_are_restricted_without_removing_field_variables(
+def test_hrs_centroid_uses_complete_field_then_projects_to_eligible_cell(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.1, 0.9, 0.2]
-    manager = HrsManager()
-    candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=3,
+    gmrf.solution[:] = [0.8, 0.1, 0.8]
+
+    selection = HrsManager().select_target(
+        gmrf, sampled_variables=set(), threshold=0.2,
         eligible_variables={0, 2})
-    assert [candidate.variable for candidate in candidates] == [2, 0]
+
+    assert selection.centroid == pytest.approx((1.5, 0.5))
+    assert selection.target.variable == 0
     assert len(gmrf.var_cells) == 3
 
 
-def test_hrs_candidates_prefer_nearer_cells_when_ucb_is_tied(
+def test_hrs_centroid_keeps_sampled_measurement_in_mass_but_not_target(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.5, 0.5, 0.5]
-    gmrf.variance[:] = [0.0, 0.0, 0.0]
-    manager = HrsManager()
-    candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=3,
-        current_xy=(0.5, 0.5), distance_weight=0.5)
-    assert [candidate.variable for candidate in candidates] == [0, 1, 2]
-    assert candidates[0].x == 0.5
-    assert candidates[0].y == 0.5
+    gmrf.solution[:] = [0.2, 0.9, 0.2]
+
+    selection = HrsManager().select_target(
+        gmrf, sampled_variables={1}, threshold=0.15,
+        eligible_variables={0, 1, 2})
+
+    assert selection.centroid == pytest.approx((1.5, 0.5))
+    assert selection.target.variable == 0
 
 
-def test_hrs_candidate_limit_selects_only_the_highest_distance_discounted_ucb(
+def test_hrs_centroid_projects_out_of_domain_center_to_nearest_valid_cell(
         map_message_factory):
-    gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.5, 0.6, 0.7]
-    gmrf.variance[:] = [0.0, 0.0, 0.0]
+    gmrf = GmrfGrid(map_message_factory(width=5, height=1))
+    gmrf.solution[:] = [0.8, 0.0, 0.0, 0.0, 0.8]
+
+    selection = HrsManager().select_target(
+        gmrf, sampled_variables=set(), threshold=0.2,
+        eligible_variables={0, 4})
+
+    assert selection.centroid == pytest.approx((2.5, 0.5))
+    assert selection.target.variable == 0
+
+
+def test_hrs_centroid_has_no_target_without_positive_mass(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=2, height=1))
+    gmrf.solution[:] = [0.1, 0.15]
+
+    selection = HrsManager().select_target(
+        gmrf, sampled_variables=set(), threshold=0.15)
+
+    assert selection.centroid is None
+    assert selection.target is None
+
+
+def test_hrs_centroid_and_target_are_recomputed_after_measurement(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=5, height=1))
+    gmrf.solution[:] = [0.8, 0.0, 0.0, 0.0, 0.8]
     manager = HrsManager()
 
-    candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, count=1,
-        current_xy=(0.5, 0.5), distance_weight=1.0)
+    first = manager.select_target(
+        gmrf, sampled_variables=set(), threshold=0.2)
+    gmrf.solution[:] = [0.8, 0.0, 0.0, 0.0, 0.4]
+    second = manager.select_target(
+        gmrf, sampled_variables={first.target.variable}, threshold=0.2)
 
-    assert [candidate.variable for candidate in candidates] == [0]
+    assert first.centroid == pytest.approx((2.5, 0.5))
+    assert first.target.variable == 2
+    assert second.centroid == pytest.approx((1.5, 0.5))
+    assert second.target.variable == 1
 
 
 def test_source_detectability_uses_accessible_sampling_points_only():

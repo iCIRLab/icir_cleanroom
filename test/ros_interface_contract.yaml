@@ -30,7 +30,8 @@ topics:
       - /gas_mapping/estimate
       - /gas_mapping/estimate_log
       - /gas_mapping/variance
-      - /gas_mapping/hrs/dd_ucb
+      - /gas_mapping/estimate_labels
+      - /gas_mapping/hrs/centroid_weight
       - /gas_mapping/measurements/poses
       - /gas_mapping/measurements/values
       - /gas_mapping/lrs/status
@@ -47,7 +48,7 @@ topics:
       - /gas_mapping/lrs/lap
       - /gas_mapping/hazard_state
       - /gas_mapping/hrs/route
-      - /gas_mapping/hrs/candidates
+      - /gas_mapping/hrs/weighted_centroid
       - /gas_mapping/hrs/status
       - /gas_mapping/phase
 services:

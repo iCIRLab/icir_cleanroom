@@ -1,1 +1,1 @@
-"""Pure LRS and HRS route-planning algorithms."""
+"""Pure LRS routing and GMRF centroid-selection algorithms."""

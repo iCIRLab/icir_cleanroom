@@ -5,9 +5,9 @@
 [![Gazebo](https://img.shields.io/badge/Gazebo-Classic-F58113?logo=gazebo&logoColor=white)](https://classic.gazebosim.org/)
 [![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-ROS 2 이동 로봇이 저해상도 순찰(LRS), GMRF 기반 가스장 추정, DD-UCB 기반 고해상도 탐색(HRS)을 반복하며 위험 가스 발생 영역을 탐지하는 자율 가스 매핑 시뮬레이션입니다.
+ROS 2 이동 로봇이 저해상도 순찰(LRS), GMRF 기반 가스장 추정, 가중 무게중심 기반 고해상도 탐색(HRS)을 반복하며 위험 가스 발생 영역을 탐지하는 자율 가스 매핑 시뮬레이션입니다.
 
-_A ROS 2 simulation for history-aware autonomous gas mapping with LRS patrol, GMRF estimation, and distance-discounted UCB exploration._
+_A ROS 2 simulation for history-aware autonomous gas mapping with LRS patrol, GMRF estimation, and weighted-centroid exploration._
 
 ## 목차
 
@@ -36,7 +36,7 @@ ICIR Cleanroom은 넓은 공간을 효율적으로 순찰하면서 위험 신호
 
 - **LRS/HRS 계층형 탐색:** 넓은 영역을 순찰하는 LRS와 위험 영역을 정밀 탐색하는 HRS를 자동 전환합니다.
 - **GMRF 가스장 추정:** 희소 측정으로부터 각 격자 셀의 예상 농도와 불확실성을 함께 추정합니다.
-- **DD-UCB 후보 선택:** 예상 농도, 불확실성, 로봇과의 거리를 함께 고려해 HRS 후보를 선정합니다.
+- **반복 무게중심 HRS:** GMRF 고농도 영역의 가중 무게중심에 가장 가까운 미측정 셀 하나를 측정하고 매번 다시 계산합니다.
 - **이력 기반 순찰 개선:** 과거의 재발 위치, 심각도, 경과시간, 불확실성을 반영해 다음 LRS 경로를 조정합니다.
 - **재현 가능한 환경 프로필:** 빈 50 m 환경과 AWS Small Warehouse 환경을 동일한 launch 인터페이스로 실행할 수 있습니다.
 
@@ -49,7 +49,7 @@ ICIR Cleanroom은 넓은 공간을 효율적으로 순찰하면서 위험 신호
 1. LRS 순찰 경로 생성과 Nav2 기반 이동
 2. 센서 측정에 따른 GMRF 평균·분산 지도 갱신
 3. 위험 농도 감지 후 HRS 전환
-4. DD-UCB 후보 선정과 정밀 탐색
+4. GMRF 가중 무게중심 기반 단일-cell 반복 탐색
 5. 대응 임계값 확인, 이력 저장, 가스원 전환
 
 ## Quick Start
@@ -103,7 +103,7 @@ flowchart LR
 | LRS Planner | 접근 가능한 영역을 K-means로 분할하고 대표 순찰 지점을 연결합니다. |
 | Mapping Controller | LRS/HRS 상태, 측정, GMRF, 이력, 경로 계획과 가스원 전환을 총괄합니다. |
 | Nav2 | 계획된 LRS/HRS 목표까지 로봇을 이동시키고 이동 결과를 반환합니다. |
-| RViz | 추정 지도, 불확실성, DD-UCB, 경로, 측정값과 검출 이력을 시각화합니다. |
+| RViz | 추정 지도, 불확실성, 무게 지도, HRS 무게중심·현재 target, 경로, 측정값과 검출 이력을 시각화합니다. |
 
 ## 실행 흐름
 
@@ -114,10 +114,10 @@ stateDiagram-v2
     LRS_PLANNING --> LRS: 이력 기반 순찰 경로 생성
     LRS --> LRS_PLANNING: 위험 미검출 / 다음 회차
     LRS --> HRS_PLANNING: 위험 감지 / 현재 LRS 회차 완료
-    HRS_PLANNING --> HRS_NAVIGATION: DD-UCB 후보와 경로 확정
-    HRS_NAVIGATION --> HRS_PLANNING: 임계값 미달 / 다음 HRS cycle
+    HRS_PLANNING --> HRS_NAVIGATION: 무게중심에 가장 가까운 셀 확정
+    HRS_NAVIGATION --> HRS_PLANNING: 측정·GMRF 갱신 / 무게중심 재계산
     HRS_NAVIGATION --> LRS_PLANNING: 최대 cycle 또는 후보 소진
-    HRS_NAVIGATION --> SOURCE_TRANSITION: 대응 임계값 검출
+    HRS_NAVIGATION --> SOURCE_TRANSITION: 실측값이 목표 농도 이상
     SOURCE_TRANSITION --> LRS_PLANNING: 가스원 전환 완료 또는 fallback
 ```
 
@@ -125,9 +125,9 @@ stateDiagram-v2
 2. LRS 경로를 계산한 뒤 각 대표 지점으로 이동해 `lrs_dwell_seconds` 동안 농도를 측정합니다.
 3. 측정값으로 GMRF를 갱신하고 히스토리를 기록합니다.
 4. 측정값이 `hazard_threshold` 이상이면 위험 상태를 유지하되, **현재 LRS 순찰과 복귀를 완료한 후** HRS로 전환합니다.
-5. HRS는 DD-UCB 점수가 높은 미측정 셀을 선택해 정밀 측정합니다.
-6. 측정값이 `hrs_response_threshold` 이상이면 검출 이벤트를 확정하고 히스토리를 저장한 뒤 가스원 전환을 요청합니다.
-7. 임계값에 도달하지 못하면 후보가 남아 있고 최대 cycle 이내인 동안 HRS를 반복하고, 그렇지 않으면 LRS로 복귀합니다.
+5. HRS는 GMRF 평균 농도에서 `hrs_centroid_threshold`를 넘는 양만 무게로 사용해 무게중심을 계산합니다.
+6. 무게중심에 가장 가까운 navigation 가능·미측정·도달 가능 셀 하나를 측정하고 GMRF를 즉시 갱신합니다.
+7. 실측값이 `hrs_response_threshold` 이상이면 즉시 성공 종료합니다. 미만이면 관측을 유지한 채 무게중심을 다시 계산하며, 목표가 없거나 최대 cycle에 도달하면 실패 종료 후 LRS로 복귀합니다.
 
 ## 핵심 알고리즘
 
@@ -150,40 +150,28 @@ GMRF(Gaussian Markov Random Field)는 가스장 격자의 유효 셀을 8-neighb
 
 실시간 갱신에는 GaBP(Gaussian Belief Propagation)를 사용합니다. 수렴 실패 시 더 낮은 damping으로 재시도하고, 배치 경계에서는 CG(Conjugate Gradient) 기준 해와의 최대 평균 오차를 검사합니다.
 
-### DD-UCB: 거리 인식 HRS 후보 선택
-
-각 미측정 후보 셀 `i`에 대해 먼저 정규화된 UCB를 계산합니다.
+### HRS: GMRF 가중 무게중심 선택
 
 ```text
-UCBᵢ = clip(μᵢ + k√σᵢ², 0, 1)
+wᵢ = max(μᵢ - hrs_centroid_threshold, 0)
+centroid = Σ(wᵢ positionᵢ) / Σwᵢ
+target = navigation 가능한 미측정 셀 중 centroid에 가장 가까운 셀
 ```
 
 - `μᵢ`: GMRF가 추정한 평균 농도
-- `σᵢ²`: GMRF가 추정한 분산
-- `k`: 탐색 강도를 조절하는 `hrs_ucb_k`
+- `wᵢ`: 낮은 배경 농도를 제외한 셀의 무게
+- `positionᵢ`: GMRF 셀 중심 좌표
 
-이후 현재 로봇 위치에서 후보까지의 거리 `dᵢ`로 점수를 감쇠합니다.
+무게중심은 navigation domain과 관계없이 전체 GMRF 농도장에서 계산합니다. 계산된 좌표가 장애물이나 navigation goal domain 밖에 있으면 가장 가까운 유효 셀을 실제 목표로 사용합니다.
 
-```text
-DD-UCBᵢ = UCBᵢ / (1 + λdᵢ)
-```
-
-- 평균 농도가 높은 셀은 **exploitation** 관점에서 높은 점수를 얻습니다.
-- 분산이 큰 셀은 **exploration** 관점에서 높은 점수를 얻습니다.
-- 멀리 있는 셀은 `hrs_distance_weight`인 `λ`에 비례해 감점됩니다.
-
-이미 측정한 셀, navigation goal domain 밖의 셀, 반복적으로 이동에 실패해 도달 불가로 판정된 셀은 후보에서 제외됩니다. 남은 셀을 DD-UCB 내림차순으로 정렬해 상위 `hrs_candidate_count`개를 선택하고, `hrs_update_seconds` 시간 예산 안에서 최대 `hrs_visit_count`개를 방문하는 exact open path를 계산합니다.
-
-기본 `reward_ordered_exact` 모드는 보상 순으로 조합을 검사하고 Held-Karp로 정확한 경로를 구합니다. `paper_exhaustive_milp` 모드는 후보 조합마다 CBC 기반 MILP를 풀어 논문식 exhaustive 절차를 재현합니다.
-
-<!-- TODO: docs/assets/dd-ucb-visualization.png 업로드 후 DD-UCB 지도 및 후보 이미지 추가 -->
+목표를 측정할 때마다 실측을 GMRF에 유지하고 무게중심과 목표를 다시 계산합니다. 이미 실측한 셀은 다시 선택하지 않으며 GMRF 분산과 로봇 이동 거리는 목표 선택에 사용하지 않습니다.
 
 ## 지원 환경
 
 | 환경 | Launch 파일 | 공간·해상도 | 기본 가스원 모드 | LRS 클러스터 |
 | --- | --- | --- | --- | ---: |
 | Empty 50 m | `empty_50m.launch.py` | 50 m × 50 m, GMRF 1.0 m | `recurrent_hotspots_after_peak` | 36 |
-| AWS Small Warehouse | `aws_small_warehouse.launch.py` | 약 14 m × 20 m, GMRF 0.5 m | `random_after_peak` | 10 |
+| AWS Small Warehouse | `aws_small_warehouse.launch.py` | 약 14 m × 20 m, GMRF 0.5 m | `manual` (`x=-1.5`, `y=-5.5`) | 10 |
 
 환경별 world, map, 로봇 초기 pose, 가스장 범위, navigation profile과 LRS 설정은 `config/environments/*.yaml`에서 관리합니다.
 
@@ -197,7 +185,7 @@ DD-UCBᵢ = UCBᵢ / (1 + λdᵢ)
 | `random_after_peak` | sampling 지점에서 설정 농도 이상 검출 가능한 임의의 grid 위치와 sigma를 생성합니다. | 이전 위치와 최소 분리 조건을 만족하는 새 가스원을 생성합니다. |
 | `recurrent_hotspots_after_peak` | 가중치로 hotspot을 선택하고 주변에 Gaussian jitter를 적용해 재발 패턴을 생성합니다. | 새 hotspot 기반 가스원을 생성합니다. |
 
-`*_after_peak`라는 모드 이름은 유지되는 공개 인터페이스입니다. 실제 전환 조건은 추정 peak가 아니라 HRS 측정값의 `hrs_response_threshold` 이상 여부입니다.
+`*_after_peak`라는 모드 이름은 유지되는 공개 인터페이스입니다. HRS 측정값이 `hrs_response_threshold` 이상이면 성공 지점을 즉시 기록하고 가스원 전환을 요청합니다.
 
 자동 모드는 최대 1,000회 동안 다음 조건을 만족하는 가스원을 생성합니다.
 
@@ -309,7 +297,7 @@ ros2 service call /gas_mapping/history/clear std_srvs/srv/Trigger "{}"
 |---|---|---|
 | `gas_history.json` | 가스 측정값과 확정 검출 이력 | 다음 실행이 빈 히스토리맵으로 시작 |
 | `gas_source_state.json` | `empty_50m`의 가스원 활성 여부, 위치, 세기, 확산도 | `manual` 모드는 YAML 기본값을 사용하고, 자동 모드는 새 가스원을 생성 |
-| `aws_small_warehouse_gas_source_state.json` | `aws_small_warehouse`의 가스원 활성 여부, 위치, 세기, 확산도 | `manual` 모드는 YAML 기본값을 사용하고, 자동 모드는 새 가스원을 생성 |
+| `aws_small_warehouse_gas_source_state.json` | `aws_small_warehouse`의 가스원 활성 여부, 위치, 세기, 확산도 | 기본 고정 가스원 설정에서는 상태 저장을 사용하지 않음 |
 
 먼저 시뮬레이션을 종료한 뒤 초기화하려는 파일만 삭제합니다.
 
@@ -366,14 +354,9 @@ ros2 param set /gas_environment_node source_enabled true
 | 파라미터 | 기본값 | 의미 |
 | --- | ---: | --- |
 | `hazard_threshold` | `0.15` | LRS에서 HRS 전환을 예약하는 위험 농도 |
-| `hrs_response_threshold` | `0.50` | HRS 확정 검출 및 가스원 전환 기준 |
-| `hrs_ucb_k` | `0.20` | UCB의 불확실성 탐색 강도 |
-| `hrs_distance_weight` | `0.03` | 후보 거리 감쇠 계수 |
-| `hrs_candidate_count` | `1` | DD-UCB 상위 후보 수 |
-| `hrs_visit_count` | `1` | 한 HRS cycle에서 방문할 최대 후보 수 |
+| `hrs_centroid_threshold` | `0.0` | GMRF 무게중심 계산 기준; 양수인 모든 평균 추정값을 무게로 사용 |
+| `hrs_response_threshold` | `0.50` | HRS 실제 측정 성공·즉시 종료 기준(Tg) |
 | `hrs_max_cycles_per_alert` | `10` | 한 위험 이벤트에서 반복할 최대 HRS cycle 수 |
-| `hrs_update_seconds` | `50.0` | HRS 이동 및 측정 시간 예산 |
-| `hrs_planner_mode` | `reward_ordered_exact` | HRS exact planner 선택 |
 
 ## 프로젝트 구조
 
@@ -388,7 +371,7 @@ icir_cleanroom/
 ├── icir_cleanroom/gas_mapping/
 │   ├── application/                # ROS 비의존 workflow와 runtime state
 │   ├── mapping/                    # GMRF, domain, projection, K-means
-│   ├── planning/                   # LRS/HRS 및 DD-UCB 경로 정책
+│   ├── planning/                   # LRS 경로 및 HRS 무게중심 정책
 │   ├── history/                    # 측정·확정 검출 이력과 JSON 저장소
 │   ├── ros/                        # ROS node, Nav2, publisher, workflow adapter
 │   ├── config.py                   # typed controller configuration
@@ -424,8 +407,8 @@ colcon test-result --verbose
 테스트는 다음 동작을 검증합니다.
 
 - GMRF GaBP/CG 결과, 수렴 재시도와 rollback
-- DD-UCB 점수와 HRS 임계값 판정
-- LRS/HRS exact 경로와 시간 예산
+- GMRF threshold-excess 무게, 무게중심과 단일-cell 선택
+- LRS exact 경로와 HRS 측정 후 GMRF 기반 반복 재계획
 - K-means 대표 지점 및 접근 가능한 domain 구성
 - history/source JSON 저장, 복원, 이전 버전 호환성
 - 환경·navigation 프로필 유효성
@@ -445,4 +428,3 @@ colcon test-result --verbose
 - Maintainer: `changgyukim`
 - Contact: [okpo2581@gmail.com](mailto:okpo2581@gmail.com)
 - Repository: [github.com/iCIRLab/icir_cleanroom](https://github.com/iCIRLab/icir_cleanroom)
-

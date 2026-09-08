@@ -71,9 +71,10 @@ class GasMappingControllerNode(Node):
         'event_state', 'snapshot_pending')
     current_event_id = StateField('event_state', 'event_id')
 
-    active_hrs_route = StateField('hrs_state', 'active_route')
+    active_hrs_target = StateField('hrs_state', 'active_target')
+    hrs_centroid = StateField('hrs_state', 'centroid')
     hrs_cycles = StateField('hrs_state', 'cycles')
-    hrs_batch_successes = StateField('hrs_state', 'batch_successes')
+    hrs_search_started_ns = StateField('hrs_state', 'search_started_ns')
     hrs_cycle_started_ns = StateField('hrs_state', 'cycle_started_ns')
     hrs_cycles_in_alert = StateField('hrs_state', 'cycles_in_alert')
     failure_counts = StateField('hrs_state', 'failure_counts')
@@ -160,9 +161,9 @@ class GasMappingControllerNode(Node):
         self.current_index = 0
         self.retry = 0
         self.returning = False
-        self.active_hrs_route = None
+        self.active_hrs_target = None
+        self.hrs_centroid = None
         self.hrs_cycles = 0
-        self.hrs_batch_successes = 0
         self.hrs_cycle_started_ns = None
         self.hrs_cycles_in_alert = 0
         self.lrs_lap = 0

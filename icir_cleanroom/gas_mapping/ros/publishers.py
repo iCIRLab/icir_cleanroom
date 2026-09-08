@@ -8,18 +8,20 @@ from geometry_msgs.msg import Point, Pose, PoseArray, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from std_msgs.msg import (
     Bool, ColorRGBA, Float32MultiArray, Int32, String)
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 
 from ..mapping.field_projection import (
     logarithmic_display as transform_logarithmic_display, project_field)
-from ..planning.hrs_policy import distance_discounted_ucb
+from ..planning.hrs_policy import concentration_weights
 
 
 PUBLISHER_SPECS = (
     ('estimate_pub', OccupancyGrid, '/gas_mapping/estimate'),
     ('estimate_log_pub', OccupancyGrid, '/gas_mapping/estimate_log'),
     ('variance_pub', OccupancyGrid, '/gas_mapping/variance'),
-    ('dd_ucb_pub', OccupancyGrid, '/gas_mapping/hrs/dd_ucb'),
+    ('estimate_labels_pub', MarkerArray, '/gas_mapping/estimate_labels'),
+    ('centroid_weight_pub', OccupancyGrid,
+     '/gas_mapping/hrs/centroid_weight'),
     ('poses_pub', PoseArray, '/gas_mapping/measurements/poses'),
     ('values_pub', Float32MultiArray, '/gas_mapping/measurements/values'),
     ('lrs_status_pub', Marker, '/gas_mapping/lrs/status'),
@@ -41,7 +43,7 @@ PUBLISHER_SPECS = (
     ('lrs_lap_pub', Int32, '/gas_mapping/lrs/lap'),
     ('hazard_pub', Bool, '/gas_mapping/hazard_state'),
     ('hrs_route_pub', Path, '/gas_mapping/hrs/route'),
-    ('hrs_candidates_pub', Marker, '/gas_mapping/hrs/candidates'),
+    ('hrs_centroid_pub', Marker, '/gas_mapping/hrs/weighted_centroid'),
     ('hrs_status_pub', Marker, '/gas_mapping/hrs/status'),
     ('phase_pub', String, '/gas_mapping/phase'),
 )
@@ -86,27 +88,28 @@ class ControllerVisualization:
     """Build and publish all controller maps, paths, and markers."""
 
     METHODS = (
-        'clear_hrs_candidates', 'display_field', 'occupancy_grid',
-        'publish_maps', 'publish_dd_ucb', 'logarithmic_display',
+        'clear_hrs_centroid', 'display_field', 'field_value_labels',
+        'occupancy_grid',
+        'publish_maps', 'publish_centroid_weight', 'logarithmic_display',
         'publish_measurements',
         'publish_lrs_active_route', 'publish_lrs_reward',
         'publish_lrs_priority_candidates', 'publish_lrs_priority_route',
         'publish_history', 'publish_empty_hrs_route', 'value_color',
-        'publish_lrs_status', 'publish_candidates', 'publish_hrs_route',
+        'publish_lrs_status', 'publish_centroid', 'publish_hrs_route',
         'publish_hrs_status',
     )
 
     def __init__(self, controller):
         self.controller = controller
 
-    def clear_hrs_candidates(self):
+    def clear_hrs_centroid(self):
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.controller.get_clock().now().to_msg()
-        marker.ns = 'gas_mapping_hrs_candidates'
+        marker.ns = 'gas_mapping_hrs_weighted_centroid'
         marker.id = 0
         marker.action = Marker.DELETE
-        self.controller.hrs_candidates_pub.publish(marker)
+        self.controller.hrs_centroid_pub.publish(marker)
 
     def display_field(self, variable_values):
         projected = project_field(
@@ -126,6 +129,9 @@ class ControllerVisualization:
     def publish_maps(self):
         template, mean, free = self.controller.display_field(self.controller.gmrf.solution)
         self.controller.estimate_pub.publish(self.controller.occupancy_grid(template, mean, free))
+        self.controller.estimate_labels_pub.publish(self.field_value_labels(
+            self.controller.gmrf.solution,
+            'gas_mapping_estimate_values', (1.0, 1.0, 1.0)))
 
         log_normalized = self.controller.logarithmic_display(mean)
         self.controller.estimate_log_pub.publish(
@@ -135,29 +141,45 @@ class ControllerVisualization:
             self.controller.gmrf.variance)
         self.controller.variance_pub.publish(self.controller.occupancy_grid(
             variance_template, variance, variance_free))
-        self.publish_dd_ucb()
+        self.publish_centroid_weight()
 
-    def publish_dd_ucb(self, current_xy=None):
+    def field_value_labels(self, values, namespace, color):
+        """Return one numeric text marker for every finite GMRF value."""
+        array = MarkerArray()
+        stamp = self.controller.get_clock().now().to_msg()
+        text_height = max(
+            0.08, min(0.24, float(self.controller.gmrf.resolution) * 0.28))
+        for variable, value in enumerate(np.asarray(values, dtype=float)):
+            if not math.isfinite(float(value)):
+                continue
+            x, y = self.controller.gmrf.cell_center(variable)
+            marker = Marker()
+            marker.header.frame_id = 'map'
+            marker.header.stamp = stamp
+            marker.ns = namespace
+            marker.id = int(variable)
+            marker.type = Marker.TEXT_VIEW_FACING
+            marker.action = Marker.ADD
+            marker.pose.position.x = float(x)
+            marker.pose.position.y = float(y)
+            marker.pose.position.z = 0.12
+            marker.pose.orientation.w = 1.0
+            marker.scale.z = text_height
+            marker.color = ColorRGBA(
+                r=float(color[0]), g=float(color[1]),
+                b=float(color[2]), a=1.0)
+            marker.text = f'{float(value):.3f}'
+            array.markers.append(marker)
+        return array
+
+    def publish_centroid_weight(self):
         if self.controller.gmrf is None:
             return
-        if current_xy is None:
-            if self.controller.latest_pose is None:
-                return
-            current_xy = (
-                self.controller.latest_pose.pose.position.x,
-                self.controller.latest_pose.pose.position.y)
-        distances = np.asarray([
-            math.hypot(x - float(current_xy[0]), y - float(current_xy[1]))
-            for x, y in (
-                self.controller.gmrf.cell_center(variable)
-                for variable in range(len(self.controller.gmrf.var_cells)))
-        ], dtype=float)
-        dd_ucb = distance_discounted_ucb(
-            self.controller.gmrf.solution, self.controller.gmrf.variance,
-            distances, float(self.controller.hrs_ucb_k),
-            float(self.controller.hrs_distance_weight))
-        template, values, free = self.controller.display_field(dd_ucb)
-        self.controller.dd_ucb_pub.publish(
+        weights = concentration_weights(
+            self.controller.gmrf.solution,
+            self.controller.hrs_centroid_threshold)
+        template, values, free = self.controller.display_field(weights)
+        self.controller.centroid_weight_pub.publish(
             self.controller.occupancy_grid(template, values, free))
 
     def logarithmic_display(self, values):
@@ -330,22 +352,28 @@ class ControllerVisualization:
                              for value in self.controller.lrs_status_values]
         self.controller.lrs_status_log_pub.publish(log_marker)
 
-    def publish_candidates(self, candidates):
+    def publish_centroid(self, centroid, target):
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.controller.get_clock().now().to_msg()
-        marker.ns = 'gas_mapping_hrs_candidates'
+        marker.ns = 'gas_mapping_hrs_weighted_centroid'
         marker.id = 0
         marker.type = Marker.POINTS
         marker.action = Marker.ADD
-        marker.scale.x = marker.scale.y = 0.35
-        marker.points = [Point(x=cell.x, y=cell.y, z=0.14)
-                         for cell in candidates]
-        marker.colors = [ColorRGBA(r=1.0, g=0.8, b=0.0, a=1.0)
-                         for _ in candidates]
-        self.controller.hrs_candidates_pub.publish(marker)
+        marker.scale.x = marker.scale.y = 0.45
+        if centroid is not None:
+            marker.points.append(Point(
+                x=float(centroid[0]), y=float(centroid[1]), z=0.18))
+            marker.colors.append(ColorRGBA(
+                r=1.0, g=0.0, b=1.0, a=1.0))
+        if target is not None:
+            marker.points.append(Point(
+                x=float(target.x), y=float(target.y), z=0.20))
+            marker.colors.append(ColorRGBA(
+                r=1.0, g=0.8, b=0.0, a=1.0))
+        self.controller.hrs_centroid_pub.publish(marker)
 
-    def publish_hrs_route(self, plan):
+    def publish_hrs_route(self, target):
         path = Path()
         path.header.frame_id = 'map'
         path.header.stamp = self.controller.get_clock().now().to_msg()
@@ -353,13 +381,12 @@ class ControllerVisualization:
             start = copy.deepcopy(self.controller.latest_pose)
             start.header = path.header
             path.poses.append(start)
-        for cell in plan.cells:
-            pose = PoseStamped()
-            pose.header = path.header
-            pose.pose.position.x = cell.x
-            pose.pose.position.y = cell.y
-            pose.pose.orientation.w = 1.0
-            path.poses.append(pose)
+        pose = PoseStamped()
+        pose.header = path.header
+        pose.pose.position.x = target.x
+        pose.pose.position.y = target.y
+        pose.pose.orientation.w = 1.0
+        path.poses.append(pose)
         self.controller.hrs_route_pub.publish(path)
 
     def publish_hrs_status(self):

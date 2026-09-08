@@ -56,6 +56,10 @@ Visualization Manager:
       Enabled: false
       Name: GMRFEstimateLinear
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/estimate}
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: false
+      Name: GMRFEstimateLinearValues
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/estimate_labels}
     - Alpha: 0.62
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
@@ -75,8 +79,8 @@ Visualization Manager:
       Color Scheme: costmap
       Draw Behind: false
       Enabled: false
-      Name: HRSPotentialDDUCB
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dd_ucb}
+      Name: HRSCentroidWeight
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/centroid_weight}
     - Alpha: 0.55
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
@@ -163,8 +167,8 @@ Visualization Manager:
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/route}
     - Class: rviz_default_plugins/Marker
       Enabled: true
-      Name: HRSCandidates
-      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/candidates}
+      Name: HRSWeightedCentroid
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/weighted_centroid}
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: HRSAccumulatedStatus
@@ -192,12 +196,13 @@ Visualization Manager:
     Current: {Class: rviz_default_plugins/TF}
   Views:
     Current:
+      Angle: 0
       Class: rviz_default_plugins/TopDownOrtho
       Name: TopDown
-      Scale: 14
+      Scale: 85
       Target Frame: map
-      X: 25
-      Y: 25
+      X: 0
+      Y: 0
 Window Geometry:
   Height: 900
   Width: 1400

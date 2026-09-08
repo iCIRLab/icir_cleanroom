@@ -4,9 +4,6 @@ from dataclasses import asdict, dataclass
 import math
 
 
-HRS_PLANNER_MODES = ('reward_ordered_exact', 'paper_exhaustive_milp')
-
-
 @dataclass(frozen=True)
 class NavigationConfig:
     lrs_dwell_seconds: float = 1.0
@@ -39,16 +36,9 @@ class DisplayConfig:
 
 @dataclass(frozen=True)
 class HrsConfig:
-    hrs_ucb_k: float = 1.0
-    hrs_distance_weight: float = 0.01
+    hrs_centroid_threshold: float = 0.0
     hrs_response_threshold: float = 0.50
     hrs_max_cycles_per_alert: int = 10
-    hrs_candidate_count: int = 1
-    hrs_visit_count: int = 1
-    hrs_speed: float = 5.0
-    hrs_update_seconds: float = 50.0
-    hrs_combination_time_limit: float = 5.0
-    hrs_planner_mode: str = 'reward_ordered_exact'
     hazard_threshold: float = 0.2
 
 
@@ -127,8 +117,6 @@ class ControllerConfig:
         if min(float(nav.lrs_dwell_seconds),
                float(nav.hrs_dwell_seconds)) < 0.0:
             raise ValueError('dwell time must be non-negative')
-        if int(hrs.hrs_candidate_count) <= 0 or int(hrs.hrs_visit_count) <= 0:
-            raise ValueError('HRS candidate and visit counts must be positive')
         if not 0.0 <= float(hrs.hazard_threshold) <= 1.0:
             raise ValueError('hazard_threshold must be in [0, 1]')
         if int(history.history_top_k) <= 0:
@@ -165,13 +153,9 @@ class ControllerConfig:
                 float(history.history_event_kernel_sigma) <= 0.0):
             raise ValueError(
                 'history event half-life and kernel sigma must be positive')
-        if float(hrs.hrs_ucb_k) < 0.0:
-            raise ValueError('hrs_ucb_k must be non-negative')
-
-        if (not math.isfinite(float(hrs.hrs_distance_weight)) or
-                float(hrs.hrs_distance_weight) < 0.0):
-            raise ValueError(
-                'hrs_distance_weight must be finite and non-negative')
+        if (not math.isfinite(float(hrs.hrs_centroid_threshold)) or
+                not 0.0 <= float(hrs.hrs_centroid_threshold) <= 1.0):
+            raise ValueError('hrs_centroid_threshold must be in [0, 1]')
 
         if not 0.0 <= float(hrs.hrs_response_threshold) <= 1.0:
             raise ValueError('hrs_response_threshold must be in [0, 1]')
@@ -180,16 +164,10 @@ class ControllerConfig:
         if (float(history.history_merge_radius) < 0.0 or
                 float(lrs.lrs_history_replace_radius) < 0.0):
             raise ValueError('history radii must be non-negative')
-        if (float(hrs.hrs_speed) <= 0.0 or
-                float(hrs.hrs_update_seconds) <= 0.0):
-            raise ValueError('HRS speed and update period must be positive')
         if not 0.0 < float(gmrf.gabp_damping) <= 1.0:
             raise ValueError('GaBP damping must be in (0, 1]')
         if not 0.0 < float(gmrf.gabp_retry_damping) <= 1.0:
             raise ValueError('GaBP retry damping must be in (0, 1]')
-        if str(hrs.hrs_planner_mode) not in HRS_PLANNER_MODES:
-            raise ValueError(
-                f'hrs_planner_mode must be one of {HRS_PLANNER_MODES}')
         timeout = float(self.source_advance_timeout_seconds)
         if not math.isfinite(timeout) or timeout <= 0.0:
             raise ValueError('source_advance_timeout_seconds must be positive')

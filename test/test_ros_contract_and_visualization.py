@@ -34,8 +34,8 @@ def test_manifest_matches_controller_publishers_and_parameter_count():
     expected_topics = set(manifest['topics']['controller']['publishers'])
     actual_topics = {topic for _, _, topic in PUBLISHER_SPECS}
     assert actual_topics == expected_topics
-    assert len(PUBLISHER_SPECS) == 23
-    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 44
+    assert len(PUBLISHER_SPECS) == 24
+    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 37
 
 
 def test_scripts_are_logic_free_compatible_entrypoints():
@@ -77,6 +77,43 @@ def test_hrs_marker_keeps_each_point_aligned_with_one_color():
     assert captured.message.colors[1].r == 0.0
     assert captured.message.colors[1].g == 0.0
     assert captured.message.colors[1].b == 0.0
+
+
+def test_weighted_centroid_marker_shows_centroid_and_projected_target():
+    captured = CapturePublisher()
+    clock = SimpleNamespace(now=lambda: SimpleNamespace(
+        to_msg=lambda: Time()))
+    controller = SimpleNamespace(
+        hrs_centroid_pub=captured, get_clock=lambda: clock)
+    target = SimpleNamespace(x=2.5, y=0.5)
+
+    ControllerVisualization(controller).publish_centroid(
+        (2.0, 0.5), target)
+
+    assert captured.message.type == Marker.POINTS
+    assert [(point.x, point.y) for point in captured.message.points] == [
+        (2.0, 0.5), (2.5, 0.5)]
+    assert len(captured.message.colors) == 2
+    assert captured.message.colors[0].b == 1.0
+    assert captured.message.colors[1].g == 0.8
+
+
+def test_gmrf_value_labels_show_one_numeric_mean_per_cell():
+    gmrf = SimpleNamespace(
+        resolution=0.5,
+        var_cells=[(0, 0), (0, 1)],
+        cell_center=lambda variable: (float(variable), float(variable + 1)))
+    clock = SimpleNamespace(now=lambda: SimpleNamespace(
+        to_msg=lambda: Time()))
+    visualization = ControllerVisualization(SimpleNamespace(
+        gmrf=gmrf, get_clock=lambda: clock))
+
+    labels = visualization.field_value_labels(
+        [0.1236, 0.9], 'test_gmrf_values', (1.0, 1.0, 1.0))
+
+    assert [marker.text for marker in labels.markers] == ['0.124', '0.900']
+    assert all(marker.type == Marker.TEXT_VIEW_FACING
+               for marker in labels.markers)
 
 
 def test_lrs_cluster_marker_uses_gmrf_cell_scale_and_cluster_colors():

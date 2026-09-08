@@ -1,4 +1,4 @@
-"""Generic deterministic exact path algorithms shared by LRS and HRS."""
+"""Generic deterministic exact path algorithms used by LRS planning."""
 
 import math
 

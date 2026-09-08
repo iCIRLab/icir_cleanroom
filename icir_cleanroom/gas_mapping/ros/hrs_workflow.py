@@ -1,12 +1,11 @@
-"""Hrs Workflow adapter."""
-
-from ..models import PlanningKind
+"""Single-cell, repeatedly replanned GMRF centroid HRS workflow."""
 
 
 class HrsWorkflow:
     METHODS = [
-        'available_variables', 'build_candidates', 'start_hrs_planning',
-        'plan_with_fallback', 'confirm_hrs_response', 'finish_hrs_cycle']
+        'available_variables', 'begin_hrs_measurement_timing',
+        'finish_hrs_measurement_timing', 'start_hrs_planning',
+        'confirm_hrs_response', 'finish_hrs_cycle', 'finish_hrs_search']
 
     def __init__(self, controller):
         self.controller = controller
@@ -17,54 +16,87 @@ class HrsWorkflow:
             self.controller.sampled_variables,
             self.controller.navigation_goal_variables)
 
-    def build_candidates(self, current_xy):
-        return self.controller.hrs_manager.build_candidates(
-            self.controller.gmrf, self.controller.sampled_variables, self.controller.hrs_ucb_k,
-            self.controller.hrs_candidate_count,
-            self.controller.navigation_goal_variables,
-            current_xy=current_xy,
-            distance_weight=self.controller.hrs_distance_weight)
+    def begin_hrs_measurement_timing(self):
+        """Start one timer spanning the complete HRS measurement session."""
+        if self.controller.hrs_search_started_ns is not None:
+            return
+        self.controller.hrs_search_started_ns = (
+            self.controller.get_clock().now().nanoseconds)
+        self.controller.get_logger().info(
+            f'=== HRS 전체 측정 시작: LRS lap={self.controller.lrs_lap} ===')
+
+    def finish_hrs_measurement_timing(self, outcome):
+        """Log and clear the complete HRS measurement-session timer."""
+        started_ns = getattr(self.controller, 'hrs_search_started_ns', None)
+        if started_ns is None:
+            return None
+        finished_ns = self.controller.get_clock().now().nanoseconds
+        elapsed_seconds = max(0.0, (finished_ns - started_ns) * 1.0e-9)
+        self.controller.hrs_search_started_ns = None
+        self.controller.get_logger().info(
+            f'=== HRS 전체 측정 종료: outcome={outcome}, '
+            f'elapsed={elapsed_seconds:.3f}s ===')
+        return elapsed_seconds
 
     def start_hrs_planning(self):
         if self.controller.planning_executor.active_task is not None:
-            return
-        available = self.controller.available_variables()
-        if not available:
-            reason = ('all reachable cells sampled' if not self.controller.unreachable_variables
-                      else 'no reachable unsampled cells remain')
-            self.controller.return_to_lrs(
-                f'HRS response threshold not reached: {reason}')
-            return
-        current_xy = (
-            self.controller.latest_pose.pose.position.x,
-            self.controller.latest_pose.pose.position.y)
-        self.controller.publish_dd_ucb(current_xy)
-        candidates = self.controller.build_candidates(current_xy)
-        self.controller.publish_candidates(candidates)
-        max_visits = min(int(self.controller.hrs_visit_count), len(candidates))
+            raise RuntimeError('another route-planning job is already active')
         self.controller.publish_phase('HRS_PLANNING')
-        self.controller.get_logger().info(
-            f'HRS cycle {self.controller.hrs_cycles + 1}: Q_u={len(available)}, '
-            f'candidates={len(candidates)}, '
-            f'ucb_k={float(self.controller.hrs_ucb_k):.3f}, '
-            f'distance_weight={float(self.controller.hrs_distance_weight):.3f}, '
-            f'visit_count={max_visits}, planner={str(self.controller.hrs_planner_mode)}, '
-            f'top_M='
-            f'{[(cell.row, cell.col, round(cell.reward, 6)) for cell in candidates]}')
-        self.controller.planning_executor.submit(
-            PlanningKind.HRS, self.controller.phase, self.controller.lrs_lap,
-            self.controller.current_event_id, None,
-            self.controller.plan_with_fallback, candidates, current_xy, max_visits)
+        self.begin_hrs_measurement_timing()
+        try:
+            selection = self.controller.hrs_manager.select_target(
+                self.controller.gmrf,
+                self.controller.sampled_variables,
+                self.controller.hrs_centroid_threshold,
+                self.controller.navigation_goal_variables)
+        except (TypeError, ValueError) as error:
+            self.controller.get_logger().error(
+                f'HRS weighted-centroid selection failed: {error}')
+            self.finish_hrs_search('weighted-centroid selection failed')
+            return
 
-    def plan_with_fallback(self, candidates, current_xy, max_visits):
-        return self.controller.hrs_manager.plan_with_fallback(
-            candidates, current_xy, max_visits, self.controller.config.hrs,
-            self.controller.hrs_dwell_seconds)
+        self.controller.hrs_centroid = selection.centroid
+        self.controller.publish_centroid(
+            selection.centroid, selection.target)
+        target = selection.target
+        if selection.centroid is None:
+            self.controller.active_hrs_target = None
+            self.controller.publish_empty_hrs_route()
+            self.finish_hrs_search(
+                'no GMRF concentration above centroid threshold')
+            return
+        if target is None:
+            self.controller.active_hrs_target = None
+            self.controller.publish_empty_hrs_route()
+            self.finish_hrs_search(
+                'no unmeasured reachable navigation cell remains')
+            return
+
+        self.controller.active_hrs_target = target
+        self.controller.current_index = 0
+        self.controller.retry = 0
+        self.controller.hrs_cycle_started_ns = (
+            self.controller.get_clock().now().nanoseconds)
+        self.controller.publish_hrs_route(target)
+        self.controller.publish_phase('HRS_NAVIGATION')
+        self.controller.get_logger().info(
+            f'HRS weighted-centroid target: '
+            f'centroid=({selection.centroid[0]:.3f},'
+            f'{selection.centroid[1]:.3f}), '
+            f'variable={target.variable}, cell=({target.row},{target.col}), '
+            f'position=({target.x:.3f},{target.y:.3f}), '
+            f'mu={target.mean:.6f}, weight={target.weight:.6f}, '
+            f'centroid_distance={target.centroid_distance:.3f}')
+        self.controller.send_current_goal()
 
     def confirm_hrs_response(self, variable, value, timestamp):
         threshold = float(self.controller.hrs_response_threshold)
         if not self.controller.hrs_manager.reached_response_threshold(
                 value, threshold):
+            self.controller.get_logger().info(
+                f'HRS continue: measured={float(value):.6f} < '
+                f'response_threshold={threshold:.6f}; '
+                'GMRF and weighted centroid will be recomputed')
             return False
 
         row, col = self.controller.gmrf.var_cells[int(variable)]
@@ -77,65 +109,62 @@ class HrsWorkflow:
             self.controller.get_logger().error(
                 f'HRS 확정 검출 이벤트 기록 실패: {error}')
             inserted = False
-        if inserted:
+        if not inserted:
             self.controller.get_logger().warning(
-                f'HRS 대응 임계값 검출: cell=({int(row)},{int(col)}), '
-                f'value={float(value):.4f} >= threshold={threshold:.4f}')
-        else:
-            self.controller.get_logger().warning(
-                f'HRS 대응 이벤트가 이미 기록되었거나 저장할 수 없습니다: '
+                'HRS 검출 이벤트가 이미 기록되었거나 저장할 수 없습니다: '
                 f'event={self.controller.current_event_id}')
-
-        # Persist the authoritative measurement event before any optional
-        # GMRF recovery or external source-transition operation.
         self.controller.publish_history()
-        self.controller.persist_history('HRS response threshold detection')
+        self.controller.persist_history('successful HRS detection')
         if self.controller.hrs_gmrf_dirty:
             if not self.controller.finalize_hrs_gmrf_batch(
-                    'HRS response threshold detection'):
+                    'successful HRS detection'):
                 self.controller.get_logger().warning(
                     '확정 검출은 유지하지만 최종 GMRF 복구에는 실패했습니다')
+        self.controller.get_logger().warning(
+            f'HRS successful detection: cell=({int(row)},{int(col)}), '
+            f'measured={float(value):.6f} >= threshold={threshold:.6f}')
+        self.finish_hrs_measurement_timing('response threshold reached')
         self.controller.start_source_transition(
-            f'response threshold detected at ({int(row)},{int(col)}), '
+            f'successful HRS detection at ({int(row)},{int(col)}), '
             f'value={float(value):.4f}, threshold={threshold:.4f}')
         return True
 
+    def finish_hrs_search(self, reason):
+        self.controller.get_logger().warning(f'HRS terminated: {reason}')
+        self.finish_hrs_measurement_timing(reason)
+        self.controller.return_to_lrs(f'HRS terminated: {reason}')
+
     def finish_hrs_cycle(self):
-        actual_seconds = (
-            (self.controller.get_clock().now().nanoseconds - self.controller.hrs_cycle_started_ns)
-            * 1.0e-9)
-        deadline = float(self.controller.hrs_update_seconds)
-        deadline_text = ('DEADLINE MISS' if actual_seconds > deadline
-                         else 'on time')
+        actual_seconds = 0.0
+        if self.controller.hrs_cycle_started_ns is not None:
+            actual_seconds = (
+                (self.controller.get_clock().now().nanoseconds -
+                 self.controller.hrs_cycle_started_ns) * 1.0e-9)
+        target = self.controller.active_hrs_target
         self.controller.hrs_cycles += 1
         self.controller.hrs_cycles_in_alert += 1
         self.controller.get_logger().info(
-            f'=== HRS cycle {self.controller.hrs_cycles} 완료: '
-            f'success={self.controller.hrs_batch_successes}/'
-            f'{len(self.controller.active_hrs_route.cells)}, '
-            f'expected={self.controller.active_hrs_route.expected_seconds:.3f}s, '
-            f'actual={actual_seconds:.3f}s, {deadline_text} ===')
+            f'=== HRS centroid iteration {self.controller.hrs_cycles} '
+            f'complete: target='
+            f'{None if target is None else target.variable}, '
+            f'actual={actual_seconds:.3f}s, action=recompute_centroid ===')
         map_updated = self.controller.finalize_hrs_gmrf_batch(
-            f'HRS cycle {self.controller.hrs_cycles}')
+            f'HRS centroid iteration {self.controller.hrs_cycles}')
         self.controller.publish_hrs_status()
-        self.controller.persist_history(f'HRS cycle {self.controller.hrs_cycles}')
-        self.controller.active_hrs_route = None
+        self.controller.persist_history(
+            f'HRS centroid iteration {self.controller.hrs_cycles}')
+        self.controller.active_hrs_target = None
+        self.controller.hrs_cycle_started_ns = None
         if not map_updated:
-            self.controller.return_to_lrs(
-                'HRS response threshold not reached: GMRF update failed')
+            self.finish_hrs_search('GMRF update failed')
             return
         if (self.controller.hrs_cycles_in_alert >=
                 int(self.controller.hrs_max_cycles_per_alert)):
-            self.controller.return_to_lrs(
-                f'HRS response threshold {float(self.controller.hrs_response_threshold):.4f} '
-                f'not reached after {self.controller.hrs_cycles_in_alert} cycles')
+            self.finish_hrs_search(
+                f'maximum {self.controller.hrs_cycles_in_alert} '
+                'HRS iterations reached')
             return
-        if not self.controller.available_variables():
-            self.controller.return_to_lrs(
-                'HRS response threshold not reached: no reachable '
-                'unvisited cells remain')
-            return
-        self.controller.start_hrs_planning()
+        self.start_hrs_planning()
 
 
 __all__ = ['HrsWorkflow']

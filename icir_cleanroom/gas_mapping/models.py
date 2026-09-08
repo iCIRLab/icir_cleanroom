@@ -20,7 +20,6 @@ class MappingPhase(str, Enum):
 
 class PlanningKind(str, Enum):
     LRS = 'LRS'
-    HRS = 'HRS'
 
     def __str__(self):
         return self.value
@@ -89,19 +88,23 @@ class LrsRuntimeState:
 
 @dataclass
 class HrsRuntimeState:
-    active_route: object = None
+    active_target: object = None
+    centroid: Optional[tuple] = None
     cycles: int = 0
     cycles_in_alert: int = 0
-    batch_successes: int = 0
+    search_started_ns: Optional[int] = None
     cycle_started_ns: Optional[int] = None
     failure_counts: Dict[int, int] = field(default_factory=dict)
     unreachable_variables: Set[int] = field(default_factory=set)
     dirty: bool = False
 
     def reset_search(self):
+        self.active_target = None
+        self.centroid = None
         self.cycles = 0
         self.cycles_in_alert = 0
-        self.batch_successes = 0
+        self.search_started_ns = None
+        self.cycle_started_ns = None
         self.failure_counts.clear()
         self.unreachable_variables.clear()
         self.dirty = False
