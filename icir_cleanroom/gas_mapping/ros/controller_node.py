@@ -12,8 +12,10 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, Float64, String
 from std_srvs.srv import Trigger
+from visualization_msgs.msg import Marker
 
 from ..application.hrs import HrsManager
+from ..application.hrs_run_log import HrsRunLog
 from ..application.lrs import LrsManager
 from ..application.measurement import MeasurementManager
 from ..application.navigation import NavigationManager
@@ -31,6 +33,7 @@ from ..models import (
 from ..phase_machine import PhaseMachine
 from .nav2_client import Nav2Client
 from .hrs_workflow import HrsWorkflow
+from .hrs_run_logging import record_hrs, source_position
 from .lrs_workflow import LrsWorkflow
 from .navigation_workflow import NavigationWorkflow
 from .planning_workflow import PlanningWorkflow
@@ -104,6 +107,13 @@ class GasMappingControllerNode(Node):
         # services adopt their immutable config groups.
         for name, value in self.config.flat_values().items():
             setattr(self, name, value)
+        self.hrs_log_source = None
+        self.hrs_run_log = HrsRunLog(
+            self.hrs_results_directory,
+            'ros_simulation' if self.get_parameter('use_sim_time').value else 'ros_wall_clock')
+        self.create_subscription(
+            Marker, '/gas_mapping/source',
+            lambda msg: source_position(self, msg), transient_qos())
         self.navigation_state = NavigationState()
         self.lrs_state = LrsRuntimeState()
         self.event_state = MappingEventState()
@@ -214,6 +224,7 @@ class GasMappingControllerNode(Node):
             'LRS route, GMRF domain, sensor pose와 Nav2를 기다리는 중...')
 
     def destroy_node(self):
+        record_hrs(self, 'finish', outcome='interrupted', reason='node_shutdown')
         self.planning_executor.shutdown()
         self.measurement_manager.cancel()
         self.navigation_manager.cancel_active_goal()

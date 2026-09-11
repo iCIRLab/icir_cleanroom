@@ -26,6 +26,8 @@ class SamplingDistanceOracle:
         self.geometry = geometry
         self.free_mask = mask.copy()
         self._distances = {}
+        self._current_origin = None
+        self._current_distances = None
 
     def _free_cell(self, point):
         row, col = self.geometry.world_to_cell(*point)
@@ -40,6 +42,12 @@ class SamplingDistanceOracle:
         cached = self._distances.get(start)
         if cached is not None:
             return cached
+        distances = self._compute_cell_distances(start)
+        self._distances[start] = distances
+        return distances
+
+    def _compute_cell_distances(self, start):
+        """One Dijkstra traversal from start to all reachable map cells."""
         distances = np.full(self.free_mask.shape, np.inf, dtype=float)
         distances[start] = 0.0
         queue = [(0.0, start[0], start[1])]
@@ -64,8 +72,33 @@ class SamplingDistanceOracle:
                     distances[next_row, next_col] = candidate
                     heapq.heappush(
                         queue, (candidate, next_row, next_col))
-        self._distances[start] = distances
         return distances
+
+    def distances_from(self, first, targets):
+        """Batch HRS distances with a bounded, one-origin distance-field cache.
+
+        Uses the same grid, 8-connected edge costs and corner restrictions as
+        distance(). A new sampling map creates a new oracle in the controller.
+        LRS pairwise caches are intentionally left unchanged.
+        """
+        targets = tuple((float(x), float(y)) for x, y in targets)
+        if not targets:
+            return ()
+        first = (float(first[0]), float(first[1]))
+        origin = self._free_cell(first)
+        cells = [self._free_cell(point) for point in targets]
+        if self._current_origin != origin:
+            self._current_distances = self._compute_cell_distances(origin)
+            self._current_origin = origin
+        result = []
+        for point, cell in zip(targets, cells):
+            value = (math.dist(first, point) if cell == origin
+                     else float(self._current_distances[cell]))
+            if not math.isfinite(value):
+                raise ValueError(
+                    f'no sampling-domain path connects {first} and {point}')
+            result.append(value)
+        return tuple(result)
 
     def _direct_grid_cost(self, first, second):
         """Return an obstacle-free optimal octile path, when available."""

@@ -15,12 +15,11 @@ def generate_launch_description():
         'launch', 'gas_mapping.launch.py')
     return LaunchDescription([
         DeclareLaunchArgument(
-            'hrs_candidate_threshold',
-            description='Required HRS posterior-score candidate threshold'),
+            'repeat_after_hrs', default_value='true', choices=['true', 'false'],
+            description='Repeat after HRS; false stops mapping after the first HRS search'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(common_launch),
             launch_arguments={
+                'repeat_after_hrs': LaunchConfiguration('repeat_after_hrs'),
                 'environment': 'aws_small_warehouse',
-                'hrs_candidate_threshold': LaunchConfiguration(
-                    'hrs_candidate_threshold'),
             }.items())])

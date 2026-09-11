@@ -52,10 +52,8 @@ class HrsManager:
 
     def build_candidates(
             self, gmrf, sampled_variables, ucb_coefficient,
-            threshold, eligible_variables=None):
-        threshold = float(threshold)
-        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
-            raise ValueError('candidate threshold must be in [0, 1]')
+            eligible_variables=None):
+        """Score every eligible unmeasured cell without a UCB cutoff."""
         ucb_values = normalized_ucb(
             gmrf.solution, gmrf.variance, ucb_coefficient)
 
@@ -64,8 +62,6 @@ class HrsManager:
                 len(gmrf.var_cells), sampled_variables,
                 eligible_variables)):
             ucb = float(ucb_values[variable])
-            if ucb < threshold:
-                continue
             row, col = gmrf.var_cells[variable]
             x, y = gmrf.cell_center(variable)
             candidates.append(HrsCandidate(
@@ -85,7 +81,7 @@ class HrsManager:
 
     @staticmethod
     def select_candidate(
-            candidates, current_xy, distance_fn, distance_weight):
+            candidates, current_xy, distance_fn, distance_weight, *, distances=None):
         """Score current candidates and select exactly one DD-UCB target."""
         current = (float(current_xy[0]), float(current_xy[1]))
         if not all(math.isfinite(value) for value in current):
@@ -93,9 +89,14 @@ class HrsManager:
         candidates = tuple(candidates)
         if not candidates:
             return (), None
-        distances = tuple(float(distance_fn(
-            current, (candidate.x, candidate.y)))
-            for candidate in candidates)
+        if distances is None:
+            distances = tuple(float(distance_fn(
+                current, (candidate.x, candidate.y)))
+                for candidate in candidates)
+        else:
+            distances = tuple(float(value) for value in distances)
+            if len(distances) != len(candidates):
+                raise ValueError('distance count must match candidates')
         scores, normalized_ucb_values, normalized_distances = (
             distance_aware_scores(
                 [candidate.score if candidate.ucb is None else candidate.ucb

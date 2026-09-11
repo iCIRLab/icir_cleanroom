@@ -5,6 +5,7 @@ import math
 import time
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
+from .hrs_run_logging import record_hrs
 
 
 class NavigationWorkflow:
@@ -105,6 +106,13 @@ class NavigationWorkflow:
         self.controller.dwell_timer = None
         if result.phase != self.controller.phase:
             return
+        if self.controller.phase == 'HRS_NAVIGATION':
+            if result.mean is None:
+                record_hrs(self.controller, 'measurement_failed', reason='no_sensor_samples')
+            else:
+                record_hrs(self.controller, 'measurement',
+                           xy=(result.pose.pose.position.x, result.pose.pose.position.y),
+                           value=result.mean, sample_count=result.sample_count)
         if result.mean is None:
             self.controller.get_logger().warning(
                 '농도 표본이 없어 이 포인트를 미측정으로 남깁니다')
@@ -175,6 +183,9 @@ class NavigationWorkflow:
         self.controller.advance_after_target()
 
     def navigation_failed(self, reason):
+        if self.controller.phase == 'HRS_NAVIGATION':
+            record_hrs(self.controller, 'navigation_failed', reason=reason,
+                       attempt=self.controller.retry + 1)
         self.controller.retry += 1
         if self.controller.retry <= int(self.controller.max_retries):
             self.controller.get_logger().warning(

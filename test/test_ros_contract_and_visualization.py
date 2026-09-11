@@ -10,7 +10,7 @@ from visualization_msgs.msg import Marker
 from icir_cleanroom.gas_mapping.application.hrs import (
     HrsCandidate)
 from icir_cleanroom.gas_mapping.config import (
-    DEFAULT_CONTROLLER_PARAMETERS, REQUIRED_CONTROLLER_PARAMETERS)
+    DEFAULT_CONTROLLER_PARAMETERS)
 from icir_cleanroom.gas_mapping.mapping.kmeans_partition import (
     ClusterCell, KMeansPartition)
 from icir_cleanroom.gas_mapping.ros.lrs_planner_node import (
@@ -38,8 +38,7 @@ def test_manifest_matches_controller_publishers_and_parameter_count():
     actual_topics = {topic for _, _, topic in PUBLISHER_SPECS}
     assert actual_topics == expected_topics
     assert len(PUBLISHER_SPECS) == 28
-    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 38
-    assert REQUIRED_CONTROLLER_PARAMETERS == ('hrs_candidate_threshold',)
+    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 40
 
 
 def test_scripts_are_logic_free_compatible_entrypoints():
@@ -52,13 +51,13 @@ def test_scripts_are_logic_free_compatible_entrypoints():
         assert 'from icir_cleanroom.gas_mapping.ros.' in source
 
 
-def test_all_mapping_launch_entrypoints_require_candidate_threshold():
+def test_all_mapping_launch_entrypoints_have_no_candidate_threshold():
     for launch_file in (
             'gas_mapping.launch.py', 'empty_50m.launch.py',
             'aws_small_warehouse.launch.py', 'cleanroom_empty.launch.py'):
         source = (PACKAGE_ROOT / 'launch' / launch_file).read_text(
             encoding='utf-8')
-        assert "'hrs_candidate_threshold'" in source
+        assert "'hrs_candidate_threshold'" not in source
         assert 'DeclareLaunchArgument' in source
 
 
@@ -129,7 +128,7 @@ def test_field_value_labels_show_one_numeric_value_per_gmrf_cell():
     assert sparse_labels.markers[0].text == '0.420'
 
 
-def test_hrs_candidate_marker_highlights_representatives_and_target():
+def test_hrs_candidate_marker_shows_only_selected_target():
     captured = CapturePublisher()
     clock = SimpleNamespace(now=lambda: SimpleNamespace(
         to_msg=lambda: Time()))
@@ -145,10 +144,13 @@ def test_hrs_candidate_marker_highlights_representatives_and_target():
         candidates, (candidates[0], candidates[1]), candidates[1])
 
     colors = captured.message.colors
-    assert len(captured.message.points) == len(colors) == 3
-    assert (colors[0].g, colors[0].b) == (0.85, 1.0)
-    assert (colors[1].r, colors[1].g) == (0.0, 1.0)
-    assert (colors[2].r, colors[2].g) == (1.0, 0.8)
+    assert len(captured.message.points) == len(colors) == 1
+    assert captured.message.points[0].x == candidates[1].x
+    assert (colors[0].r, colors[0].g, colors[0].b) == (0.0, 1.0, 0.2)
+    assert len(candidates) == 3
+    visualization.publish_candidates(candidates, selected=None)
+    assert captured.message.action == Marker.DELETE
+    assert not captured.message.points
 
 
 def test_ucb_rviz_maps_and_value_labels_are_disabled_by_default():

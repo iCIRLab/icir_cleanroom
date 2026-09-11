@@ -1,5 +1,7 @@
 """Single-cell, repeatedly replanned HRS DD-UCB workflow."""
 
+from .hrs_run_logging import record_hrs
+
 
 class HrsWorkflow:
     METHODS = [
@@ -20,7 +22,6 @@ class HrsWorkflow:
             self.controller.gmrf,
             self.controller.sampled_variables,
             self.controller.hrs_ucb_k,
-            self.controller.hrs_candidate_threshold,
             self.controller.navigation_goal_variables)
 
     def start_hrs_planning(self):
@@ -32,11 +33,13 @@ class HrsWorkflow:
             self.controller.latest_pose.pose.position.y)
         try:
             candidates = self.controller.build_candidates()
+            distances = self.controller.sampling_distance.distances_from(
+                current_xy, ((cell.x, cell.y) for cell in candidates))
             scored_candidates, selected = (
                 self.controller.hrs_manager.select_candidate(
                     candidates, current_xy,
                     self.controller.sampling_distance.distance,
-                    self.controller.hrs_distance_weight))
+                    self.controller.hrs_distance_weight, distances=distances))
         except (TypeError, ValueError) as error:
             self.controller.get_logger().error(
                 f'HRS candidate selection failed: {error}')
@@ -54,8 +57,6 @@ class HrsWorkflow:
             f'HRS iteration {self.controller.hrs_cycles + 1}: '
             f'robot_pose=({current_xy[0]:.3f},{current_xy[1]:.3f}), '
             f'ucb_k={float(self.controller.hrs_ucb_k):.3f}, '
-            f'T_candidate_ucb='
-            f'{float(self.controller.hrs_candidate_threshold):.4f}, '
             f'distance_weight='
             f'{float(self.controller.hrs_distance_weight):.4f}, '
             f'candidates={len(scored_candidates)}, '
@@ -66,10 +67,12 @@ class HrsWorkflow:
             self.controller.hrs_route_targets = []
             self.controller.publish_empty_hrs_route()
             self.finish_hrs_search(
-                'no UCB candidate above candidate threshold')
+                'no eligible unmeasured HRS cells remain')
             return
 
         self.controller.hrs_route_targets = [selected]
+        record_hrs(self.controller, 'target_selected', variable=selected.variable,
+                   x=selected.x, y=selected.y, score=selected.score)
         self.controller.active_hrs_target = selected
         self.controller.current_index = 0
         self.controller.retry = 0
@@ -103,6 +106,8 @@ class HrsWorkflow:
         self.controller.hrs_confirmed_variable = int(variable)
         self.controller.hrs_confirmed_value = float(value)
         self.controller.hrs_confirmed_timestamp = float(timestamp)
+        record_hrs(self.controller, 'finish', outcome='detected',
+                   reason='measured_concentration_threshold_reached')
         row, col = self.controller.gmrf.var_cells[int(variable)]
         try:
             inserted = self.controller.history.record_confirmed_event(
@@ -123,14 +128,22 @@ class HrsWorkflow:
             f'HRS successful detection: variable={int(variable)}, '
             f'cell=({int(row)},{int(col)}), measured={float(value):.6f} >= '
             f'T_goal_concentration={goal_threshold:.6f}; terminating HRS')
-        self.controller.start_source_transition(
+        reason = (
             f'successful HRS detection at ({int(row)},{int(col)}), '
             f'value={float(value):.4f}, threshold={goal_threshold:.4f}')
+        if self.controller.repeat_after_hrs:
+            self.controller.start_source_transition(reason)
+        else:
+            self.controller.complete_mapping(reason)
         return True
 
     def finish_hrs_search(self, reason):
+        record_hrs(self.controller, 'finish', outcome='failed', reason=reason)
         self.controller.get_logger().warning(f'HRS terminated: {reason}')
-        self.controller.return_to_lrs(f'HRS terminated: {reason}')
+        if self.controller.repeat_after_hrs:
+            self.controller.return_to_lrs(f'HRS terminated: {reason}')
+        else:
+            self.controller.complete_mapping(f'HRS terminated: {reason}')
 
     def finish_hrs_cycle(self):
         actual_seconds = 0.0

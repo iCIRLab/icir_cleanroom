@@ -386,29 +386,18 @@ class ControllerVisualization:
 
     def publish_candidates(
             self, candidates, representatives=(), selected=None):
+        """Display only the selected target; keep scoring candidates untouched."""
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.controller.get_clock().now().to_msg()
         marker.ns = 'gas_mapping_hrs_candidates'
         marker.id = 0
         marker.type = Marker.POINTS
-        marker.action = Marker.ADD
+        marker.action = Marker.DELETE if selected is None else Marker.ADD
         marker.scale.x = marker.scale.y = 0.35
-        target_variable = (
-            None if selected is None else selected.variable)
-        representative_variables = {
-            candidate.variable for candidate in representatives}
-        for cell in candidates:
-            marker.points.append(Point(x=cell.x, y=cell.y, z=0.14))
-            if cell.variable == target_variable:
-                marker.colors.append(ColorRGBA(
-                    r=0.0, g=1.0, b=0.2, a=1.0))
-            elif cell.variable in representative_variables:
-                marker.colors.append(ColorRGBA(
-                    r=0.0, g=0.85, b=1.0, a=1.0))
-            else:
-                marker.colors.append(ColorRGBA(
-                    r=1.0, g=0.8, b=0.0, a=1.0))
+        if selected is not None:
+            marker.points.append(Point(x=selected.x, y=selected.y, z=0.14))
+            marker.colors.append(ColorRGBA(r=0.0, g=1.0, b=0.2, a=1.0))
         self.controller.hrs_candidates_pub.publish(marker)
 
     def publish_hrs_route(self, targets):

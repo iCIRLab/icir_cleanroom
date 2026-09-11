@@ -1,4 +1,4 @@
-"""Pure HRS UCB filtering and distance-aware score policies."""
+"""Pure HRS UCB and distance-aware score policies."""
 
 import numpy as np
 

@@ -123,9 +123,8 @@ def launch_setup(context):
     controller_parameters = dict(mapping_params)
     controller_parameters['use_sim_time'] = use_sim_time
     controller_parameters.update({
-        'hrs_candidate_threshold': ParameterValue(
-            LaunchConfiguration('hrs_candidate_threshold'),
-            value_type=float),
+        'repeat_after_hrs': ParameterValue(
+            LaunchConfiguration('repeat_after_hrs'), value_type=bool),
     })
     model_path = os.path.join(
         package_dir, 'models', 'aws_small_warehouse')
@@ -205,7 +204,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
         DeclareLaunchArgument(
-            'hrs_candidate_threshold',
-            description='Required HRS posterior-score candidate threshold'),
+            'repeat_after_hrs', default_value='true', choices=['true', 'false'],
+            description='Repeat LRS/HRS after HRS ends; false stops mapping once and keeps visualization'),
         OpaqueFunction(function=launch_setup),
     ])

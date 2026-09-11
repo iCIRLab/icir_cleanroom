@@ -5,6 +5,7 @@ from ..application.lrs import LrsManager
 from ..models import PlanningKind
 from ..planning.lrs_priority import (
     history_adjusted_cycle, solve_lrs_priority_route)
+from .hrs_run_logging import record_hrs
 
 
 class LrsWorkflow:
@@ -167,6 +168,8 @@ class LrsWorkflow:
             points, start_xy, distance_fn)
 
     def finish_lrs_navigation(self):
+        if self.controller.lap_hazard_detected:
+            record_hrs(self.controller, 'start')
         self.controller.returning = False
         self.controller.get_logger().info(
             f'=== LRS lap {self.controller.lrs_lap} 완료: '

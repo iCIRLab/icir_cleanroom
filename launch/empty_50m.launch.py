@@ -11,13 +11,12 @@ def generate_launch_description():
     package_dir = get_package_share_directory('icir_cleanroom')
     return LaunchDescription([
         DeclareLaunchArgument(
-            'hrs_candidate_threshold',
-            description='Required HRS posterior-score candidate threshold'),
+            'repeat_after_hrs', default_value='true', choices=['true', 'false'],
+            description='Repeat after HRS; false stops mapping after the first HRS search'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
                 package_dir, 'launch', 'gas_mapping.launch.py')),
             launch_arguments={
+                'repeat_after_hrs': LaunchConfiguration('repeat_after_hrs'),
                 'environment': 'empty_50m',
-                'hrs_candidate_threshold': LaunchConfiguration(
-                    'hrs_candidate_threshold'),
             }.items())])

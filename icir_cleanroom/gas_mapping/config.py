@@ -36,9 +36,10 @@ class DisplayConfig:
 
 @dataclass(frozen=True)
 class HrsConfig:
+    repeat_after_hrs: bool = True
+    hrs_results_directory: str = '~/.ros/icir_cleanroom/hrs_results'
     hrs_ucb_k: float = 0.2
     hrs_distance_weight: float = 0.03
-    hrs_candidate_threshold: float | None = None
     hrs_response_threshold: float = 0.90
     hrs_max_cycles_per_alert: int = 10
     hazard_threshold: float = 0.2
@@ -118,6 +119,10 @@ class ControllerConfig:
     def validate(self):
         nav, gmrf, hrs = self.navigation, self.gmrf, self.hrs
         lrs, history = self.lrs, self.history
+        if not isinstance(hrs.repeat_after_hrs, bool):
+            raise ValueError('repeat_after_hrs must be a boolean')
+        if not isinstance(hrs.hrs_results_directory, str) or not hrs.hrs_results_directory.strip():
+            raise ValueError('hrs_results_directory must be a nonempty path')
         if min(float(nav.lrs_dwell_seconds),
                float(nav.hrs_dwell_seconds)) < 0.0:
             raise ValueError('dwell time must be non-negative')
@@ -165,11 +170,6 @@ class ControllerConfig:
                 float(hrs.hrs_distance_weight) < 0.0):
             raise ValueError(
                 'hrs_distance_weight must be finite and non-negative')
-        if hrs.hrs_candidate_threshold is None:
-            raise ValueError('hrs_candidate_threshold is required')
-        if (not math.isfinite(float(hrs.hrs_candidate_threshold)) or
-                not 0.0 <= float(hrs.hrs_candidate_threshold) <= 1.0):
-            raise ValueError('hrs_candidate_threshold must be in [0, 1]')
 
         if not 0.0 <= float(hrs.hrs_response_threshold) <= 1.0:
             raise ValueError('hrs_response_threshold must be in [0, 1]')
@@ -188,20 +188,14 @@ class ControllerConfig:
 
 
 DEFAULT_CONTROLLER_PARAMETERS = ControllerConfig.defaults().flat_values()
-REQUIRED_CONTROLLER_PARAMETERS = ('hrs_candidate_threshold',)
 
 
 def declare_controller_config(node):
     """Declare all public ROS parameters and return their typed snapshot."""
-    from rclpy.parameter import Parameter
-
     values = {}
     for name, default in DEFAULT_CONTROLLER_PARAMETERS.items():
         node.declare_parameter(name, default)
         values[name] = node.get_parameter(name).value
-    required = node.declare_parameter(
-        REQUIRED_CONTROLLER_PARAMETERS[0], Parameter.Type.DOUBLE)
-    values[REQUIRED_CONTROLLER_PARAMETERS[0]] = required.value
     return ControllerConfig.from_mapping(values)
 
 
@@ -209,5 +203,4 @@ __all__ = [
     'ControllerConfig', 'DisplayConfig', 'GmrfConfig', 'HistoryConfig',
     'HrsConfig', 'LrsConfig', 'NavigationConfig',
     'DEFAULT_CONTROLLER_PARAMETERS', 'declare_controller_config',
-    'REQUIRED_CONTROLLER_PARAMETERS',
 ]

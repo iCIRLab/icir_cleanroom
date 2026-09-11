@@ -294,21 +294,21 @@ def test_hrs_candidates_are_restricted_without_removing_field_variables(
     gmrf.solution[:] = [0.1, 0.9, 0.2]
     manager = HrsManager()
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.15,
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0,
         eligible_variables={0, 2})
-    assert [candidate.variable for candidate in candidates] == [2]
+    assert [candidate.variable for candidate in candidates] == [0, 2]
     assert len(gmrf.var_cells) == 3
 
 
-def test_hrs_candidate_threshold_is_inclusive_and_has_no_top_n_limit(
+def test_hrs_candidates_include_all_scores_without_a_cutoff(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=3, height=1))
-    gmrf.solution[:] = [0.49, 0.5, 0.8]
+    gmrf.solution[:] = [0.0, 0.01, 0.8]
     gmrf.variance[:] = [0.0, 0.0, 0.0]
     manager = HrsManager()
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.5)
-    assert [candidate.variable for candidate in candidates] == [1, 2]
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0)
+    assert [candidate.variable for candidate in candidates] == [0, 1, 2]
 
 
 def test_hrs_distance_aware_score_selects_exactly_one_candidate(
@@ -318,14 +318,14 @@ def test_hrs_distance_aware_score_selects_exactly_one_candidate(
     gmrf.variance[:] = 0.0
     manager = HrsManager()
     candidates = manager.build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.0, threshold=0.5)
+        gmrf, sampled_variables=set(), ucb_coefficient=0.0)
 
     scored, selected = manager.select_candidate(
         candidates, current_xy=(1.5, 0.5),
         distance_fn=lambda first, second: math.dist(first, second),
         distance_weight=2.0)
 
-    assert [candidate.variable for candidate in scored] == [0, 1]
+    assert [candidate.variable for candidate in scored] == [0, 1, 2]
     assert selected.variable == 1
 
 
@@ -336,7 +336,7 @@ def test_hrs_candidates_exclude_sampled_unreachable_and_ineligible_cells(
     manager = HrsManager(HrsRuntimeState(unreachable_variables={2}))
 
     candidates = manager.build_candidates(
-        gmrf, sampled_variables={1}, ucb_coefficient=0.2, threshold=0.5,
+        gmrf, sampled_variables={1}, ucb_coefficient=0.2,
         eligible_variables={0, 1, 2})
 
     assert [candidate.variable for candidate in candidates] == [0]
@@ -356,7 +356,7 @@ def test_hrs_target_uses_obstacle_aware_sampling_distance(
         GridGeometry.from_message(map_msg), free)
 
     candidates = HrsManager().build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.2, threshold=0.5,
+        gmrf, sampled_variables=set(), ucb_coefficient=0.2,
         eligible_variables={across_wall, same_side})
     _, selected = HrsManager.select_candidate(
         candidates, current_xy=(1.5, 2.5),
@@ -371,7 +371,7 @@ def test_hrs_candidate_route_distance_tie_uses_stable_cell_order(
     gmrf.solution[:] = [0.7, 0.7]
 
     candidates = HrsManager().build_candidates(
-        gmrf, sampled_variables=set(), ucb_coefficient=0.2, threshold=0.5)
+        gmrf, sampled_variables=set(), ucb_coefficient=0.2)
     _, selected = HrsManager.select_candidate(
         candidates, current_xy=(1.0, 0.5),
         distance_fn=lambda first, second: math.dist(first, second),
@@ -387,3 +387,18 @@ def test_source_detectability_uses_accessible_sampling_points_only():
         source, 0.2, sampling_points=[(0.0, 0.0)])
     assert random_source_is_lrs_detectable(
         source, 0.2, sampling_points=[(4.0, 5.0)])
+
+
+def test_zero_ucb_cells_still_select_one_and_recompute_from_current_pose(map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=3, height=1))
+    gmrf.solution[:] = 0.0
+    gmrf.variance[:] = 0.0
+    manager = HrsManager()
+    candidates = manager.build_candidates(gmrf, set(), 0.2)
+    for current, expected in [((0.5, 0.5), 0), ((2.5, 0.5), 2)]:
+        scored, selected = manager.select_candidate(
+            candidates, current, math.dist, 0.03)
+        assert selected.variable == expected
+        assert selected.score == max(cell.score for cell in scored)
+    candidates = manager.build_candidates(gmrf, {0, 1, 2}, 0.2)
+    assert manager.select_candidate(candidates, (0.5, 0.5), math.dist, 0.03) == ((), None)
