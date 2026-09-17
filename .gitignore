@@ -1,6 +1,7 @@
 build/
 install/
 log/
+results/
 
 __pycache__/
 *.pvc

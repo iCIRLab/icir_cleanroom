@@ -43,4 +43,5 @@
         <build_type>ament_cmake</build_type>
         <gazebo_ros gazebo_plugin_path="${prefix}/lib"/>
     </export>
+  <exec_depend>python3-psutil</exec_depend>
 </package>

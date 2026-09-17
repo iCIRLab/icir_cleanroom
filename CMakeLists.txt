@@ -63,6 +63,7 @@ install(TARGETS
 )
 
 install(PROGRAMS
+    scripts/run_methods_once.py
     scripts/gas_empty_map_node.py
     scripts/gas_environment_node.py
     scripts/gas_mapping_controller_node.py

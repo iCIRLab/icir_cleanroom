@@ -39,6 +39,9 @@ def launch_setup(context):
     if not os.path.isfile(profile_path):
         raise RuntimeError(f'Environment profile not found: {profile_path}')
     profile = load_yaml(profile_path)
+    run_config_path = LaunchConfiguration('run_config').perform(context)
+    run_config = load_yaml(run_config_path) if run_config_path else {}
+    profile = run_config.get('profile', profile)
     environment = profile['environment']
     world = os.path.join(package_dir, environment['world'])
     map_yaml = os.path.join(package_dir, environment['map'])
@@ -59,7 +62,7 @@ def launch_setup(context):
     robot_sdf = os.path.join(
         package_dir, 'urdf', 'tb3_with_gas_sensor.sdf')
     rviz = os.path.join(package_dir, 'rviz', 'cleanroom_empty.rviz')
-    base_nav2_params = os.path.join(
+    base_nav2_params = run_config.get('base_nav2_params') or os.path.join(
         package_dir, 'config', 'nav2_params.yaml')
     try:
         nav2_config, robot_motion = load_navigation_settings(
@@ -77,6 +80,7 @@ def launch_setup(context):
     mapping_params = load_yaml(os.path.join(
         package_dir, 'config', 'mapping', 'default.yaml'))[
             'gas_mapping_controller_node']['ros__parameters']
+    mapping_params = run_config.get('controller', mapping_params)
 
     with open(robot_urdf, 'r', encoding='utf-8') as stream:
         robot_description = stream.read()
@@ -202,6 +206,8 @@ def launch_setup(context):
 
 def generate_launch_description():
     return LaunchDescription([
+        DeclareLaunchArgument('run_config', default_value='',
+                              description='Optional batch snapshot YAML (profile and controller)'),
         DeclareLaunchArgument('environment', default_value='empty_50m'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
