@@ -14,12 +14,16 @@ def generate_launch_description():
         get_package_share_directory('icir_cleanroom'),
         'launch', 'gas_mapping.launch.py')
     return LaunchDescription([
+        DeclareLaunchArgument('save_history', default_value='true',
+                              choices=['true', 'false'],
+                              description='Write history files; existing history is still loaded'),
         DeclareLaunchArgument(
             'repeat_after_hrs', default_value='true', choices=['true', 'false'],
             description='Repeat after HRS; false stops mapping after the first HRS search'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(common_launch),
             launch_arguments={
+                'save_history': LaunchConfiguration('save_history'),
                 'repeat_after_hrs': LaunchConfiguration('repeat_after_hrs'),
                 'environment': 'aws_small_warehouse',
             }.items())])

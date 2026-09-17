@@ -59,6 +59,7 @@ class LrsConfig:
 
 @dataclass(frozen=True)
 class HistoryConfig:
+    save_history: bool = True
     history_top_k: int = 3
     history_merge_radius: float = 5.0
     history_recent_alpha: float = 0.5
@@ -128,6 +129,8 @@ class ControllerConfig:
             raise ValueError('dwell time must be non-negative')
         if not 0.0 <= float(hrs.hazard_threshold) <= 1.0:
             raise ValueError('hazard_threshold must be in [0, 1]')
+        if not isinstance(history.save_history, bool):
+            raise ValueError('save_history must be a boolean')
         if int(history.history_top_k) <= 0:
             raise ValueError('history_top_k must be positive')
         if (int(lrs.lrs_priority_candidate_count) <= 0 or

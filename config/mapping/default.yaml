@@ -25,6 +25,7 @@ gas_mapping_controller_node:
     repeat_after_hrs: true
     hrs_results_directory: ~/.ros/icir_cleanroom/hrs_results
     hazard_threshold: 0.15
+    save_history: true
     history_top_k: 3
     history_merge_radius: 5.0
     lrs_history_replace_radius: 5.0

@@ -123,6 +123,7 @@ def launch_setup(context):
     controller_parameters = dict(mapping_params)
     controller_parameters['use_sim_time'] = use_sim_time
     controller_parameters.update({
+        'save_history': ParameterValue(LaunchConfiguration('save_history'), value_type=bool),
         'repeat_after_hrs': ParameterValue(
             LaunchConfiguration('repeat_after_hrs'), value_type=bool),
     })
@@ -203,6 +204,9 @@ def generate_launch_description():
         DeclareLaunchArgument('environment', default_value='empty_50m'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument('save_history', default_value='true',
+                              choices=['true', 'false'],
+                              description='Write history files; existing history is still loaded'),
         DeclareLaunchArgument(
             'repeat_after_hrs', default_value='true', choices=['true', 'false'],
             description='Repeat LRS/HRS after HRS ends; false stops mapping once and keeps visualization'),

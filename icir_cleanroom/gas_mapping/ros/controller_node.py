@@ -499,6 +499,9 @@ class GasMappingControllerNode(Node):
         return persisted
 
     def persist_history(self, reason):
+        if not self.save_history:
+            self.get_logger().debug(f'History file save disabled: {reason}')
+            return False
         if self.history is None:
             return False
         try:
@@ -519,7 +522,10 @@ class GasMappingControllerNode(Node):
             response.message = 'GMRF/history map is not ready'
             return response
         try:
-            self.history.clear()
+            if self.save_history:
+                self.history.clear()
+            else:
+                self.history.reset()
         except OSError as error:
             response.success = False
             response.message = f'Failed to clear history: {error}'
@@ -528,7 +534,9 @@ class GasMappingControllerNode(Node):
         self.publish_history()
         response.success = True
         response.message = (
-            'Gas history cleared; the active LRS route will be rebuilt '
+            ('Gas history cleared; ' if self.save_history else
+             'In-memory history cleared; saved history file unchanged; ') +
+            'the active LRS route will be rebuilt '
             'at the next lap')
         self.get_logger().info(response.message)
         return response
