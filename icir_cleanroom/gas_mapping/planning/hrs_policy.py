@@ -18,14 +18,12 @@ def _validated_fields(mean, variance):
 
 
 def normalized_ucb(mean, variance, coefficient=1.0):
-    """Return a normalized concentration upper-confidence potential."""
+    """Return unclipped UCB in normalized concentration units."""
     coefficient = float(coefficient)
     if not np.isfinite(coefficient) or coefficient < 0.0:
         raise ValueError('UCB coefficient must be finite and non-negative')
     mean_values, variance_values = _validated_fields(mean, variance)
-    return np.clip(
-        mean_values + coefficient * np.sqrt(np.maximum(variance_values, 0.0)),
-        0.0, 1.0)
+    return mean_values + coefficient * np.sqrt(np.maximum(variance_values, 0.0))
 
 
 def _minmax(values, constant_value):
@@ -39,7 +37,7 @@ def _minmax(values, constant_value):
 
 
 def distance_aware_scores(ucb, distances, distance_weight):
-    """Normalize candidate-only UCB/distance and return DD-UCB scores."""
+    """Return DD-UCB scores, raw UCB, and candidate-normalized distances."""
     ucb_values = np.asarray(ucb, dtype=float)
     distance_values = np.asarray(distances, dtype=float)
     if ucb_values.shape != distance_values.shape:
@@ -54,10 +52,9 @@ def distance_aware_scores(ucb, distances, distance_weight):
         raise ValueError(
             'distance weight must be finite and non-negative')
 
-    normalized_ucb_values = _minmax(ucb_values, constant_value=1.0)
     normalized_distances = _minmax(distance_values, constant_value=0.0)
-    scores = normalized_ucb_values - weight * normalized_distances
-    return scores, normalized_ucb_values, normalized_distances
+    scores = ucb_values - weight * normalized_distances
+    return scores, ucb_values, normalized_distances
 
 
 __all__ = [

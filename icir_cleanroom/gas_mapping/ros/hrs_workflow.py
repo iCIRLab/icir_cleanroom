@@ -101,7 +101,6 @@ class HrsWorkflow:
             f'mu={selected.mean:.6f}, '
             f'sigma={max(selected.variance, 0.0) ** 0.5:.6f}, '
             f'ucb={selected.ucb:.6f}, '
-            f'normalized_ucb={selected.normalized_ucb:.6f}, '
             f'distance={selected.distance:.3f}, '
             f'normalized_distance={selected.normalized_distance:.6f}, '
             f'strategy_score={selected.score:.6f}')

@@ -48,19 +48,28 @@ def test_gabp_matches_locked_cg_solution(map_message_factory):
     ], atol=1.0e-9)
 
 
-def test_normalized_ucb_is_preserved():
+def test_normalized_ucb_preserves_values_above_one():
     np.testing.assert_allclose(
-        normalized_ucb([0.1, 0.8], [0.04, 0.01], 1.5),
-        [0.4, 0.95])
+        normalized_ucb([0.1, 0.8, 0.9, 1.0], [0.04, 0.01, 0.04, 0.16], 1.5),
+        [0.4, 0.95, 1.2, 1.6])
 
 
-def test_distance_aware_scores_normalize_ucb_and_distance_separately():
+def test_distance_aware_scores_preserve_ucb_and_normalize_only_distance():
     scores, ucb, distance = distance_aware_scores(
         [0.6, 0.8], [1.0, 5.0], distance_weight=0.5)
 
-    np.testing.assert_allclose(ucb, [0.0, 1.0])
+    np.testing.assert_allclose(ucb, [0.6, 0.8])
     np.testing.assert_allclose(distance, [0.0, 1.0])
-    np.testing.assert_allclose(scores, [0.0, 0.5])
+    np.testing.assert_allclose(scores, [0.6, 0.3])
+
+
+def test_equal_distances_leave_raw_ucb_scores_unchanged():
+    for distances in ([0.0, 0.0], [10.0, 10.0]):
+        scores, ucb, distance = distance_aware_scores(
+            [0.6, 0.6], distances, distance_weight=0.5)
+        np.testing.assert_allclose(scores, [0.6, 0.6])
+        np.testing.assert_allclose(ucb, [0.6, 0.6])
+        np.testing.assert_array_equal(distance, [0.0, 0.0])
 
 
 def test_gmrf_variable_and_directed_message_order(map_message_factory):

@@ -19,7 +19,6 @@ class HrsCandidate:
     variance: float
     ucb: float | None = None
     distance: float = 0.0
-    normalized_ucb: float = 0.0
     normalized_distance: float = 0.0
 
 
@@ -97,7 +96,7 @@ class HrsManager:
             distances = tuple(float(value) for value in distances)
             if len(distances) != len(candidates):
                 raise ValueError('distance count must match candidates')
-        scores, normalized_ucb_values, normalized_distances = (
+        scores, ucb_values, normalized_distances = (
             distance_aware_scores(
                 [candidate.score if candidate.ucb is None else candidate.ucb
                  for candidate in candidates], distances,
@@ -105,12 +104,9 @@ class HrsManager:
         scored = tuple(
             replace(
                 candidate,
-                ucb=float(
-                    candidate.score if candidate.ucb is None
-                    else candidate.ucb),
+                ucb=float(ucb_values[index]),
                 score=float(scores[index]),
                 distance=float(distances[index]),
-                normalized_ucb=float(normalized_ucb_values[index]),
                 normalized_distance=float(normalized_distances[index]))
             for index, candidate in enumerate(candidates))
         selected = min(scored, key=lambda candidate: (

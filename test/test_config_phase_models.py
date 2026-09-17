@@ -336,12 +336,15 @@ def test_hrs_planning_routes_only_one_highest_dd_ucb_cell():
 
     HrsWorkflow(controller).start_hrs_planning()
 
-    assert controller.active_hrs_target.variable == 6
-    assert [target.variable for target in controller.hrs_route_targets] == [6]
+    # Raw UCB minus normalized distance: scores are about 0.608, 0.6, 0.4.
+    assert controller.active_hrs_target.variable == 4
+    assert controller.active_hrs_target.score == pytest.approx(
+        0.7 - 0.5 * (1.0 - 0.1) / (5.0 - 0.1))
+    assert [target.variable for target in controller.hrs_route_targets] == [4]
     assert controller.hrs_candidate_variables == {4, 5, 6}
     assert controller.hrs_cycle_started_ns == 123
     assert events == [
-        ('phase', 'HRS_PLANNING'), 'candidates', ('route', (6,)),
+        ('phase', 'HRS_PLANNING'), 'candidates', ('route', (4,)),
         ('phase', 'HRS_NAVIGATION'), 'send']
 
 

@@ -152,29 +152,37 @@ GMRF(Gaussian Markov Random Field)는 가스장 격자의 유효 셀을 8-neighb
 
 ### DD-UCB: 거리 인식 HRS 후보 선택
 
-각 미측정 후보 셀 `i`에 대해 먼저 정규화된 UCB를 계산합니다.
+각 미측정 후보 셀 `i`에 대해 먼저 UCB를 계산합니다. 1을 초과하는 값도 clip 없이 유지합니다.
 
 ```text
-UCBᵢ = clip(μᵢ + k√σᵢ², 0, 1)
+UCBᵢ = μᵢ + k√σᵢ²
 ```
 
 - `μᵢ`: GMRF가 추정한 평균 농도
 - `σᵢ²`: GMRF가 추정한 분산
 - `k`: 탐색 강도를 조절하는 `hrs_ucb_k`
 
-이후 현재 로봇 위치에서 후보까지의 거리 `dᵢ`로 점수를 감쇠합니다.
+UCB는 min-max 정규화 없이 그대로 사용합니다. 이동 가능한 미측정 셀 전체에서 현재 로봇 위치까지의 경로 거리 `dᵢ`만 min-max 정규화합니다. 수식은 다음과 같습니다.
 
 ```text
-DD-UCBᵢ = UCBᵢ / (1 + λdᵢ)
+DD-UCBᵢ = UCBᵢ - λ × minmax(dᵢ)
 ```
 
-- 평균 농도가 높은 셀은 **exploitation** 관점에서 높은 점수를 얻습니다.
-- 분산이 큰 셀은 **exploration** 관점에서 높은 점수를 얻습니다.
-- 멀리 있는 셀은 `hrs_distance_weight`인 `λ`에 비례해 감점됩니다.
+`λ`는 `hrs_distance_weight`이며, 같은 UCB일 때 가까운 셀을 선호합니다.
+전체 거리가 같으면 정규화 거리는 0이며, 최종 점수는 UCB와 같습니다.
 
-이미 측정한 셀, navigation goal domain 밖의 셀, 반복적으로 이동에 실패해 도달 불가로 판정된 셀은 후보에서 제외됩니다. 남은 셀을 DD-UCB 내림차순으로 정렬해 상위 `hrs_candidate_count`개를 선택하고, `hrs_update_seconds` 시간 예산 안에서 최대 `hrs_visit_count`개를 방문하는 exact open path를 계산합니다.
+HRS 거리 계산은 현재 로봇 셀을 출발점으로 다익스트라 탐색을 한 번 수행하고,
+각 후보 셀의 거리를 조회합니다. 지도 해상도(warehouse 지도는 0.05m), 8방향 이동 비용,
+장애물 모서리 통과 금지 규칙은 기존과 같습니다. 같은 로봇 셀에서는 계산 결과를 재사용하고,
+로봇 셀이 바뀌면 다시 계산하며 새 sampling map을 받으면 캐시를 초기화합니다.
+이 거리는 지도 격자상의 최단 거리이며 Nav2의 실제 주행 궤적 길이는 아닙니다.
+거리 일괄 조회의 계산 순서에 따른 부동소수점 오차는 발생할 수 있습니다.
 
-기본 `reward_ordered_exact` 모드는 보상 순으로 조합을 검사하고 Held-Karp로 정확한 경로를 구합니다. `paper_exhaustive_milp` 모드는 후보 조합마다 CBC 기반 MILP를 풀어 논문식 exhaustive 절차를 재현합니다.
+후보 점수 임계값 필터는 사용하지 않습니다. 이미 측정한 셀, navigation goal domain 밖의 셀,
+반복적으로 이동에 실패해 도달 불가로 판정된 셀만 제외하고, **DD-UCB 점수가 가장 높은 셀 하나**를 목표로 선택합니다.
+동점이면 UCB가 높은 셀, 이후 행·열·변수 번호 순으로 결정합니다.
+이동 → 실측 → 지도 갱신 후 현재 로봇 위치를 반영해 전체 남은 후보를 다시 평가합니다.
+후보가 없으면 HRS를 종료합니다. 실측 농도 기반 종료 조건과 `repeat_after_hrs` 옵션은 유지합니다.
 
 <!-- TODO: docs/assets/dd-ucb-visualization.png 업로드 후 DD-UCB 지도 및 후보 이미지 추가 -->
 
@@ -368,7 +376,7 @@ ros2 param set /gas_environment_node source_enabled true
 | `hazard_threshold` | `0.15` | LRS에서 HRS 전환을 예약하는 위험 농도 |
 | `hrs_response_threshold` | `0.50` | HRS 확정 검출 및 가스원 전환 기준 |
 | `hrs_ucb_k` | `0.20` | UCB의 불확실성 탐색 강도 |
-| `hrs_distance_weight` | `0.03` | 후보 거리 감쇠 계수 |
+| `hrs_distance_weight` | `0.5` | 거리 min-max 정규화 값에 곱하는 페널티 가중치 |
 | `hrs_candidate_count` | `1` | DD-UCB 상위 후보 수 |
 | `hrs_visit_count` | `1` | 한 HRS cycle에서 방문할 최대 후보 수 |
 | `hrs_max_cycles_per_alert` | `10` | 한 위험 이벤트에서 반복할 최대 HRS cycle 수 |

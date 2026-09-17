@@ -25,7 +25,7 @@ gas_mapping_controller_node:
     hrs_search_patience: 10
     hrs_search_min_relative_improvement: 0.0
     hrs_ucb_k: 0.2
-    hrs_distance_weight: 0.1
+    hrs_distance_weight: 0.5
     hrs_max_cycles_per_alert: 100
     repeat_after_hrs: true
     hrs_results_directory: ~/.ros/icir_cleanroom/hrs_results

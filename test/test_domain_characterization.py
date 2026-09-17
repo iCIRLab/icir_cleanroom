@@ -329,6 +329,25 @@ def test_hrs_distance_aware_score_selects_exactly_one_candidate(
     assert selected.variable == 1
 
 
+def test_hrs_target_depends_on_raw_ucb_gain_over_distance_penalty(
+        map_message_factory):
+    gmrf = GmrfGrid(map_message_factory(width=3, height=1))
+    gmrf.variance[:] = 0.0
+    manager = HrsManager()
+    for values, expected_scores, expected_variable in (
+            ([0.50, 0.51, 0.52], [0.50, 0.41, 0.32], 0),
+            ([0.50, 0.70, 0.90], [0.50, 0.60, 0.70], 2),
+            ([0.8, 0.5, 0.1], [0.8, 0.4, -0.1], 0)):
+        gmrf.solution[:] = values
+        candidates = manager.build_candidates(gmrf, set(), 0.2)
+        scored, selected = manager.select_candidate(
+            candidates, current_xy=(0.5, 0.5), distance_fn=math.dist,
+            distance_weight=0.2, distances=[10.0, 20.0, 30.0])
+        np.testing.assert_allclose([cell.score for cell in scored], expected_scores)
+        np.testing.assert_allclose([cell.ucb for cell in scored], values)
+        assert selected.variable == expected_variable
+
+
 def test_hrs_candidates_exclude_sampled_unreachable_and_ineligible_cells(
         map_message_factory):
     gmrf = GmrfGrid(map_message_factory(width=4, height=1))
