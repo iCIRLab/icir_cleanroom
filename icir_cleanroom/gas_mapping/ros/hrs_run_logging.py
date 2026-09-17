@@ -31,8 +31,12 @@ def record_hrs(controller, kind, **details):
         elif kind == 'finish':
             pose = controller.latest_pose
             xy = None if pose is None else (pose.pose.position.x, pose.pose.position.y)
+            gmrf = getattr(controller, 'gmrf', None)
+            to_cell_center = None if gmrf is None else (
+                lambda x, y: gmrf.geometry.cell_center(*gmrf.geometry.world_to_cell(x, y)))
             row = recorder.finish(ros, wall, robot_xy=xy,
-                                  source_end=controller.hrs_log_source, **details)
+                                  source_end=controller.hrs_log_source,
+                                  to_cell_center=to_cell_center, **details)
             if row is not None:
                 controller.get_logger().info(
                     f'HRS result: initial={row["initial_seconds"]}, '
@@ -41,7 +45,9 @@ def record_hrs(controller, kind, **details):
                     f'source=({row["source_x"]},{row["source_y"]}), '
                     f'estimated=({row["estimated_source_x"]},{row["estimated_source_y"]}), '
                     f'reason={row["termination_reason"]}; file={recorder.directory / "runs.csv"}')
+            return row
         else:
             recorder.event(kind, ros, wall, **details)
     except (OSError, ValueError, RuntimeError) as error:
         controller.get_logger().error(f'HRS result logging failed: {error}')
+    return None

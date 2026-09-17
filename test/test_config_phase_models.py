@@ -129,7 +129,8 @@ def test_adaptive_hrs_cycle_replans_until_maximum(
         persist_history=lambda reason: events.append('persist'),
         start_hrs_planning=lambda: events.append('replan'),
         start_source_transition=lambda reason: events.append('transition'),
-        complete_mapping=lambda reason: events.append('complete'))
+        complete_mapping=lambda reason: events.append('complete'),
+        publish_estimated_source=lambda xy: None)
 
     HrsWorkflow(controller).finish_hrs_cycle()
 
@@ -210,7 +211,8 @@ def test_subgoal_hrs_dwell_updates_gmrf_and_continues():
             events.append('gmrf_finalize') or True,
         publish_hrs_status=lambda: events.append('status'),
         persist_history=lambda reason: events.append('persist'),
-        start_hrs_planning=lambda: events.append('recompute'))
+        start_hrs_planning=lambda: events.append('recompute'),
+        publish_estimated_source=lambda xy: None)
     controller.advance_after_target = (
         lambda: HrsWorkflow(controller).finish_hrs_cycle())
 
@@ -241,7 +243,8 @@ def test_hrs_cycle_advances_source_when_gmrf_recovery_fails():
         finalize_hrs_gmrf_batch=lambda reason: False,
         publish_hrs_status=lambda: events.append('publish'),
         persist_history=lambda reason: events.append('persist'),
-        start_source_transition=lambda reason: events.append('transition'))
+        start_source_transition=lambda reason: events.append('transition'),
+        publish_estimated_source=lambda xy: None)
 
     HrsWorkflow(controller).finish_hrs_cycle()
 
@@ -276,7 +279,8 @@ def test_hrs_planning_advances_source_when_candidates_are_exhausted():
             info=lambda message: events.append('info'),
             error=lambda message: events.append('error'),
             warning=lambda message: events.append('warning')),
-        start_source_transition=lambda reason: events.append(reason))
+        start_source_transition=lambda reason: events.append(reason),
+        publish_estimated_source=lambda xy: None)
 
     HrsWorkflow(controller).start_hrs_planning()
 
@@ -359,7 +363,8 @@ def test_each_completed_measurement_discards_route_and_replans():
         finalize_hrs_gmrf_batch=lambda reason: events.append('gmrf') or True,
         publish_hrs_status=lambda: events.append('status'),
         persist_history=lambda reason: events.append('history'),
-        start_hrs_planning=lambda: events.append('recompute'))
+        start_hrs_planning=lambda: events.append('recompute'),
+        publish_estimated_source=lambda xy: None)
 
     HrsWorkflow(controller).finish_hrs_cycle()
 
@@ -389,6 +394,20 @@ def test_hrs_end_repeat_policy(repeat, reason):
         repeat_after_hrs=repeat,
         get_logger=lambda: SimpleNamespace(warning=lambda msg: None),
         start_source_transition=lambda msg: calls.append(('transition', msg)),
-        complete_mapping=lambda msg: calls.append(('complete', msg)))
+        complete_mapping=lambda msg: calls.append(('complete', msg)),
+        publish_estimated_source=lambda xy: None)
     HrsWorkflow(controller).finish_hrs_search(reason)
     assert calls == [('transition' if repeat else 'complete', 'HRS terminated: '+reason)]
+
+
+@pytest.mark.parametrize('row,expected', [
+    (None, None),
+    ({'estimated_source_cell_x': 3.5, 'estimated_source_cell_y': 4.5}, (3.5, 4.5)),
+    ({'estimated_source_cell_x': None, 'estimated_source_cell_y': None}, None),
+])
+def test_publish_source_estimate_reads_the_pre_snapped_cell(row, expected):
+    published = []
+    controller = SimpleNamespace(
+        publish_estimated_source=lambda xy: published.append(xy))
+    HrsWorkflow(controller).publish_source_estimate(row)
+    assert published == [expected]

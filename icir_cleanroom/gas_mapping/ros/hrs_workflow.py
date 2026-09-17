@@ -1,5 +1,7 @@
 """Single-cell, repeatedly replanned HRS DD-UCB workflow."""
 
+from geometry_msgs.msg import PoseStamped
+
 from .hrs_run_logging import record_hrs
 from ..application.hrs_methods import HrsSession
 from ..application.hrs_termination import attempts_exhausted
@@ -105,13 +107,56 @@ class HrsWorkflow:
             f'strategy_score={selected.score:.6f}')
         self.controller.send_current_goal()
 
+    def publish_source_estimate(self, finished_row):
+        """Show the run log's own final estimate, already snapped to its
+        GMRF cell center (`estimated_source_cell_x/y`); a missing row or
+        cell (e.g. no gmrf yet) clears the marker instead."""
+        x = y = None
+        if finished_row is not None:
+            x, y = (finished_row['estimated_source_cell_x'],
+                    finished_row['estimated_source_cell_y'])
+        self.controller.publish_estimated_source(None if x is None else (x, y))
+
     def finish_hrs_search(self, reason):
-        record_hrs(self.controller, 'finish', outcome='failed', reason=reason)
+        finished_row = record_hrs(self.controller, 'finish', outcome='failed', reason=reason)
         self.controller.get_logger().warning(f'HRS terminated: {reason}')
+        self.publish_source_estimate(finished_row)
+        self._approach_final_estimate_then_complete(finished_row, reason)
+
+    def _complete_hrs_search(self, reason):
         if self.controller.repeat_after_hrs:
             self.controller.start_source_transition(f'HRS terminated: {reason}')
         else:
             self.controller.complete_mapping(f'HRS terminated: {reason}')
+
+    def _approach_final_estimate_then_complete(self, finished_row, reason):
+        """One last, best-effort move to the final estimated cell so the
+        robot is sitting there (for a screenshot/visual check) before
+        wrapping up; a missing estimate or a failed approach still
+        completes normally instead of blocking termination."""
+        x = None if finished_row is None else finished_row.get('estimated_source_cell_x')
+        y = None if finished_row is None else finished_row.get('estimated_source_cell_y')
+        if x is None or y is None:
+            self._complete_hrs_search(reason)
+            return
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = self.controller.get_clock().now().to_msg()
+        goal_pose.pose.position.x = float(x)
+        goal_pose.pose.position.y = float(y)
+        goal_pose.pose.orientation.w = 1.0
+        self.controller.get_logger().info(
+            f'HRS 종료, 최종 추정 위치로 이동: ({float(x):.3f}, {float(y):.3f})')
+        generation = self.controller.navigation_manager.issue_goal()
+
+        def approach_failed(navigation_reason):
+            self.controller.get_logger().warning(
+                f'최종 추정 위치로 이동 실패({navigation_reason}); 그대로 종료합니다')
+            self._complete_hrs_search(reason)
+
+        self.controller.nav2.send(
+            goal_pose, generation,
+            lambda: self._complete_hrs_search(reason), approach_failed)
 
     def finish_hrs_cycle(self):
         actual_seconds = 0.0

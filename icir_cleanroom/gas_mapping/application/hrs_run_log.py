@@ -71,7 +71,8 @@ class HrsRunLog:
             stage='INITIAL', attempt_count=0, search_iterations=0, navigation_attempts=0,
             parameters=parameters, start_ros=ros, start_wall=wall,
             last_ros=ros, last_wall=wall, first_ros=None, first_wall=None,
-            last_measurement=None, measurement_count=0, clock_valid=True,
+            last_measurement=None, best_measurement=None,
+            measurement_count=0, clock_valid=True,
             start_utc=datetime.now(timezone.utc).isoformat())
         self.event('lrs_complete_hrs_start', ros, wall,
                    source=source, parameters=parameters)
@@ -85,6 +86,9 @@ class HrsRunLog:
         run = self.active
         run['measurement_count'] += 1
         run['last_measurement'] = (float(xy[0]), float(xy[1]), float(value))
+        if (run['best_measurement'] is None or
+                float(value) > run['best_measurement'][2]):
+            run['best_measurement'] = run['last_measurement']
         self.event('measurement_complete', ros, wall, xy=xy, value=value,
                    sample_count=sample_count, measurement_count=run['measurement_count'])
 
@@ -98,7 +102,8 @@ class HrsRunLog:
         self.event('initial_gmrf_complete', ros, wall)
         run['stage'] = 'SEARCH'
 
-    def finish(self, ros, wall, *, outcome, reason, robot_xy, source_end):
+    def finish(self, ros, wall, *, outcome, reason, robot_xy, source_end,
+               to_cell_center=None):
         if self.active is None:
             return None
         self._clock(ros, wall)
@@ -111,9 +116,18 @@ class HrsRunLog:
         initial, search, total = durations(run['start_ros'], run['first_ros'], ros)
         wi, ws, wt = durations(run['start_wall'], run['first_wall'], wall)
         measured = run['last_measurement']
+        best = run['best_measurement']
         # A failed/interrupted trial does not claim its last pose is a source.
         estimated = measured[:2] if outcome == 'detected' and measured is not None else None
         error = math.dist(estimated, source_end) if estimated is not None and source_end is not None else None
+        # Same final estimate (detected -> estimated; otherwise the highest
+        # concentration actually observed, not just wherever the run happened
+        # to stop), kept as the precise raw pose above and also snapped to its
+        # GMRF cell center here for display; to_cell_center is optional so
+        # this class stays independent of any grid.
+        final_xy = estimated if estimated is not None else best[:2] if best is not None else None
+        cell_xy = (to_cell_center(*final_xy)
+                   if to_cell_center is not None and final_xy is not None else None)
         def coord(xy, index):
             return None if xy is None else xy[index]
         row = dict(
@@ -133,9 +147,12 @@ class HrsRunLog:
             source_x=coord(source_end, 0), source_y=coord(source_end, 1),
             source_position_available=source_end is not None,
             estimated_source_x=coord(estimated, 0), estimated_source_y=coord(estimated, 1),
+            estimated_source_cell_x=coord(cell_xy, 0), estimated_source_cell_y=coord(cell_xy, 1),
             final_robot_x=coord(robot_xy, 0), final_robot_y=coord(robot_xy, 1),
             last_measurement_x=coord(measured, 0), last_measurement_y=coord(measured, 1),
             final_measured_concentration=coord(measured, 2),
+            best_measurement_x=coord(best, 0), best_measurement_y=coord(best, 1),
+            best_measured_concentration=coord(best, 2),
             measurement_count=run['measurement_count'], outcome=outcome,
             gas_source_detected=outcome == 'detected',
             gas_source_measurement_failed=None if outcome == 'interrupted' else outcome == 'failed',

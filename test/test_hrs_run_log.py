@@ -1,6 +1,7 @@
 import csv
 from types import SimpleNamespace as NS
 import pytest
+from builtin_interfaces.msg import Time
 from icir_cleanroom.gas_mapping.application.hrs_run_log import HrsRunLog
 from icir_cleanroom.gas_mapping.ros.hrs_run_logging import record_hrs, source_position
 
@@ -69,6 +70,52 @@ def test_failed_search_logs_last_measurement_without_claiming_it_is_source(tmp_p
     assert row['source_position_error'] is None
 
 
+def test_estimated_source_cell_snaps_detection_point_but_keeps_raw_value(tmp_path):
+    snap_calls = []
+    def to_cell_center(x, y):
+        snap_calls.append((x, y))
+        return (round(x), round(y))
+    log = begin(tmp_path)
+    log.measurement(110., 1010., xy=(2.1, 3.4), value=.91, sample_count=20)
+    row = log.finish(120., 1030., outcome='detected', reason='ok',
+                      robot_xy=(2.1, 3.4), source_end=(2., 3.),
+                      to_cell_center=to_cell_center)
+    assert row['estimated_source_x'] == 2.1 and row['estimated_source_y'] == 3.4
+    assert (row['estimated_source_cell_x'], row['estimated_source_cell_y']) == (2, 3)
+    assert snap_calls == [(2.1, 3.4)]  # snapped the same point logged raw above
+
+
+def test_estimated_source_cell_falls_back_to_best_measurement_on_failure(tmp_path):
+    log = begin(tmp_path)
+    log.measurement(110., 1010., xy=(4.6, 5.4), value=.2, sample_count=10)
+    row = log.finish(120., 1030., outcome='failed', reason='no candidates',
+                      robot_xy=(4.6, 5.4), source_end=None,
+                      to_cell_center=lambda x, y: (round(x), round(y)))
+    assert row['estimated_source_x'] is None  # a failed run never claims detection
+    assert (row['estimated_source_cell_x'], row['estimated_source_cell_y']) == (5, 5)
+
+
+def test_estimated_source_cell_uses_the_highest_measured_point_not_the_last(tmp_path):
+    log = begin(tmp_path)
+    log.measurement(105., 1005., xy=(-4.0, -7.0), value=.976, sample_count=38)
+    log.measurement(110., 1010., xy=(4.6, 5.4), value=.2, sample_count=10)
+    row = log.finish(120., 1030., outcome='failed', reason='no relative improvement',
+                      robot_xy=(4.6, 5.4), source_end=None,
+                      to_cell_center=lambda x, y: (round(x), round(y)))
+    assert (row['last_measurement_x'], row['last_measurement_y']) == (4.6, 5.4)
+    assert row['final_measured_concentration'] == .2
+    assert (row['best_measurement_x'], row['best_measurement_y']) == (-4.0, -7.0)
+    assert row['best_measured_concentration'] == .976
+    assert (row['estimated_source_cell_x'], row['estimated_source_cell_y']) == (-4, -7)
+
+
+def test_estimated_source_cell_is_blank_without_a_resolver(tmp_path):
+    log = begin(tmp_path)
+    log.measurement(110., 1010., xy=(2.1, 3.4), value=.91, sample_count=20)
+    row = finish(log)  # to_cell_center omitted; default keeps this class grid-agnostic
+    assert row['estimated_source_cell_x'] is None and row['estimated_source_cell_y'] is None
+
+
 def test_missing_source_position_remains_unevaluated(tmp_path):
     log=begin(tmp_path,None)
     log.measurement(110., 1010., xy=(4.,5.), value=1., sample_count=10)
@@ -131,18 +178,43 @@ def test_finish_hrs_search_saves_row_before_advancing_source(tmp_path):
     log.measurement(110., 1010., xy=(2.1,3.), value=.95, sample_count=20)
     calls=[]
     c=NS(hrs_run_log=log,hrs_log_source=(2.,3.),latest_pose=NS(pose=NS(position=NS(x=2.1,y=3.))),
-         get_clock=lambda:NS(now=lambda:NS(nanoseconds=120_000_000_000)),
+         get_clock=lambda:NS(now=lambda:NS(nanoseconds=120_000_000_000,to_msg=lambda:Time())),
          get_logger=lambda:NS(info=lambda msg:None,warning=lambda msg:None,error=lambda msg:None),
-         repeat_after_hrs=True)
+         gmrf=NS(geometry=NS(
+             world_to_cell=lambda x,y:(0,0),cell_center=lambda r,c:(2.0,3.0))),
+         repeat_after_hrs=True,
+         navigation_manager=NS(issue_goal=lambda:1),
+         nav2=NS(send=lambda pose,gen,on_success,on_failure:on_success()),
+         publish_estimated_source=lambda xy:None)
     def start_source_transition(reason):
         assert log.active is None
         row=next(csv.DictReader((log.directory/'runs.csv').open()))
         assert row['source_x']=='2.0' and row['outcome']=='failed'
+        assert row['estimated_source_cell_x']=='2.0' and row['estimated_source_cell_y']=='3.0'
         c.hrs_log_source=(99.,99.)
         calls.append('transition')
     c.start_source_transition=start_source_transition
     HrsWorkflow(c).finish_hrs_search('no relative improvement in 10 consecutive HRS attempts')
     assert calls==['transition']
+
+
+def test_finish_hrs_search_completes_even_if_the_final_approach_fails(tmp_path):
+    from icir_cleanroom.gas_mapping.ros.hrs_workflow import HrsWorkflow
+    log=begin(tmp_path)
+    log.measurement(110., 1010., xy=(2.1,3.), value=.95, sample_count=20)
+    calls=[]
+    c=NS(hrs_run_log=log,hrs_log_source=(2.,3.),latest_pose=NS(pose=NS(position=NS(x=2.1,y=3.))),
+         get_clock=lambda:NS(now=lambda:NS(nanoseconds=120_000_000_000,to_msg=lambda:Time())),
+         get_logger=lambda:NS(info=lambda msg:None,warning=lambda msg:calls.append(('warn',msg)),error=lambda msg:None),
+         gmrf=NS(geometry=NS(
+             world_to_cell=lambda x,y:(0,0),cell_center=lambda r,c:(2.0,3.0))),
+         repeat_after_hrs=False,
+         navigation_manager=NS(issue_goal=lambda:1),
+         nav2=NS(send=lambda pose,gen,on_success,on_failure:on_failure('goal rejected')),
+         publish_estimated_source=lambda xy:None,
+         complete_mapping=lambda reason:calls.append(('complete',reason)))
+    HrsWorkflow(c).finish_hrs_search('maximum 100 HRS target attempts reached')
+    assert calls[-1]==('complete','HRS terminated: maximum 100 HRS target attempts reached')
 
 
 def test_lrs_boundary_is_recorded_before_hrs_selection(tmp_path):

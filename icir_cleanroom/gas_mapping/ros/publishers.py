@@ -50,6 +50,7 @@ PUBLISHER_SPECS = (
     ('hrs_route_pub', Path, '/gas_mapping/hrs/route'),
     ('hrs_candidates_pub', Marker, '/gas_mapping/hrs/candidates'),
     ('hrs_status_pub', Marker, '/gas_mapping/hrs/status'),
+    ('hrs_estimated_source_pub', Marker, '/gas_mapping/hrs/estimated_source'),
     ('phase_pub', String, '/gas_mapping/phase'),
 )
 
@@ -101,7 +102,7 @@ class ControllerVisualization:
         'publish_lrs_priority_candidates', 'publish_lrs_priority_route',
         'publish_history', 'publish_empty_hrs_route', 'value_color',
         'publish_lrs_status', 'publish_candidates', 'publish_hrs_route',
-        'publish_hrs_status',
+        'publish_hrs_status', 'publish_estimated_source',
     )
 
     def __init__(self, controller):
@@ -399,6 +400,26 @@ class ControllerVisualization:
             marker.points.append(Point(x=selected.x, y=selected.y, z=0.14))
             marker.colors.append(ColorRGBA(r=0.0, g=1.0, b=0.2, a=1.0))
         self.controller.hrs_candidates_pub.publish(marker)
+
+    def publish_estimated_source(self, xy):
+        """Mark HRS's final source estimate (already computed by the run
+        log) once at termination, sized just under one GMRF cell; kept
+        visible after the run ends."""
+        marker = Marker()
+        marker.header.frame_id = 'map'
+        marker.header.stamp = self.controller.get_clock().now().to_msg()
+        marker.ns = 'gas_mapping_hrs_estimated_source'
+        marker.id = 0
+        marker.type = Marker.CUBE
+        marker.action = Marker.DELETE if xy is None else Marker.ADD
+        cell = float(self.controller.gmrf.resolution) * 0.7
+        marker.scale.x = marker.scale.y = marker.scale.z = cell
+        marker.color = ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0)
+        if xy is not None:
+            marker.pose.position.x, marker.pose.position.y = float(xy[0]), float(xy[1])
+            marker.pose.position.z = 0.2
+            marker.pose.orientation.w = 1.0
+        self.controller.hrs_estimated_source_pub.publish(marker)
 
     def publish_hrs_route(self, targets):
         path = Path()

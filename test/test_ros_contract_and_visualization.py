@@ -3,6 +3,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 from builtin_interfaces.msg import Time
 from visualization_msgs.msg import Marker
@@ -37,7 +38,7 @@ def test_manifest_matches_controller_publishers_and_parameter_count():
     expected_topics = set(manifest['topics']['controller']['publishers'])
     actual_topics = {topic for _, _, topic in PUBLISHER_SPECS}
     assert actual_topics == expected_topics
-    assert len(PUBLISHER_SPECS) == 28
+    assert len(PUBLISHER_SPECS) == 29
     assert len(DEFAULT_CONTROLLER_PARAMETERS) == 45
 
 
@@ -151,6 +152,27 @@ def test_hrs_candidate_marker_shows_only_selected_target():
     visualization.publish_candidates(candidates, selected=None)
     assert captured.message.action == Marker.DELETE
     assert not captured.message.points
+
+
+def test_estimated_source_marker_shows_best_point_sized_under_one_cell():
+    captured = CapturePublisher()
+    clock = SimpleNamespace(now=lambda: SimpleNamespace(
+        to_msg=lambda: Time()))
+    visualization = ControllerVisualization(SimpleNamespace(
+        hrs_estimated_source_pub=captured, get_clock=lambda: clock,
+        gmrf=SimpleNamespace(resolution=0.5)))
+
+    visualization.publish_estimated_source((1.5, -2.5))
+    assert captured.message.action == Marker.ADD
+    assert (captured.message.pose.position.x,
+            captured.message.pose.position.y) == (1.5, -2.5)
+    assert (captured.message.color.r, captured.message.color.g,
+            captured.message.color.b) == (1.0, 1.0, 0.0)
+    assert (captured.message.scale.x, captured.message.scale.y,
+            captured.message.scale.z) == pytest.approx((0.35, 0.35, 0.35))
+
+    visualization.publish_estimated_source(None)
+    assert captured.message.action == Marker.DELETE
 
 
 def test_ucb_rviz_maps_and_value_labels_are_disabled_by_default():

@@ -196,6 +196,10 @@ Visualization Manager:
       Enabled: true
       Name: GasSource
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/source}
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: HRSEstimatedSource
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/estimated_source}
     - Class: rviz_default_plugins/RobotModel
       Description Source: Topic
       Description Topic: {Depth: 5, Durability Policy: Volatile, Reliability Policy: Reliable, Value: /robot_description}

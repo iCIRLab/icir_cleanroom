@@ -54,6 +54,7 @@ topics:
       - /gas_mapping/hrs/route
       - /gas_mapping/hrs/candidates
       - /gas_mapping/hrs/status
+      - /gas_mapping/hrs/estimated_source
       - /gas_mapping/phase
 services:
   /gas_mapping/source/advance: std_srvs/srv/Trigger
