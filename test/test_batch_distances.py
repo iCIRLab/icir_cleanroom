@@ -42,6 +42,35 @@ def test_same_cell_uses_actual_coordinates_even_when_origin_cell_is_cached():
     assert o.distances_from((.13,.13),[(.12,.12)])==(math.dist((.13,.13),(.12,.12)),)
 
 
+def test_distances_from_snaps_an_origin_just_outside_the_domain():
+    geo = GridGeometry(3, 3, .05, 0., 0.)
+    free = np.ones((3, 3), dtype=bool)
+    free[0, 0] = False  # goal tolerance can leave the robot pose here
+    free[1, 0] = False  # keep (0, 1) the unambiguous nearest free cell
+    o = SamplingDistanceOracle(geo, free)
+    target = geo.cell_center(0, 1)  # the cell _nearest_free_cell snaps to
+    just_outside = geo.cell_center(0, 0)
+    snapped = o.distances_from(just_outside, [target])
+    assert snapped == pytest.approx([math.dist(just_outside, target)])
+    # An origin outside the tracked grid entirely still resolves (clamped to
+    # the nearest border cell, then snapped to that cell's nearest free one)
+    # rather than raising: the robot really is somewhere, it never has to be
+    # rejected as an origin.
+    far_outside = o.distances_from((999, 999), [target])
+    assert len(far_outside) == 1 and math.isfinite(far_outside[0])
+
+
+def test_nearest_free_cell_has_no_distance_limit_for_a_deeply_buried_origin():
+    geo = GridGeometry(5, 5, .05, 0., 0.)
+    free = np.ones((5, 5), dtype=bool)
+    free[0:3, 0:3] = False  # a 3x3 clearance block; center is 2 cells from any free cell
+    o = SamplingDistanceOracle(geo, free)
+    deeply_buried = geo.cell_center(1, 1)
+    target = geo.cell_center(1, 3)
+    result = o.distances_from(deeply_buried, [target])
+    assert len(result) == 1 and math.isfinite(result[0])
+
+
 def test_disconnected_corner_and_new_map_invalidation():
     geo=GridGeometry(2,2,.05,0.,0.)
     blocked=SamplingDistanceOracle(geo,np.array([[True,False],[False,True]]))
@@ -50,8 +79,11 @@ def test_disconnected_corner_and_new_map_invalidation():
     fresh=SamplingDistanceOracle(geo,np.ones((2,2),bool))
     assert fresh.distances_from((.025,.025),[(.075,.075)])==pytest.approx([math.sqrt(2)*.05])
     assert fresh.distances_from((999,999),[])==()
+    # A far-outside origin clamps to the nearest border cell instead of
+    # raising; the target's own cell is still validated normally.
+    assert fresh.distances_from((999,999),[(.025,.025)])==pytest.approx([math.sqrt(2)*.05])
     with pytest.raises(ValueError,match='outside'):
-        fresh.distances_from((999,999),[(.025,.025)])
+        fresh.distances_from((.025,.025),[(999,999)])
 
 
 def test_dd_ucb_scores_and_selected_cell_match_without_pairwise_calls():

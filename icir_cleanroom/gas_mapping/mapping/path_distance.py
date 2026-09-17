@@ -4,6 +4,7 @@ import heapq
 import math
 
 import numpy as np
+from scipy.ndimage import distance_transform_edt
 
 
 class SamplingDistanceOracle:
@@ -28,6 +29,7 @@ class SamplingDistanceOracle:
         self._distances = {}
         self._current_origin = None
         self._current_distances = None
+        self._nearest_free_indices = None
 
     def _free_cell(self, point):
         row, col = self.geometry.world_to_cell(*point)
@@ -37,6 +39,23 @@ class SamplingDistanceOracle:
                 f'point ({float(point[0]):.3f}, '
                 f'{float(point[1]):.3f}) is outside the sampling domain')
         return int(row), int(col)
+
+    def _nearest_free_cell(self, point):
+        """Resolve a real robot pose to its nearest free cell, with no
+        distance limit: the robot is really standing there, so a distance
+        calculation from its current position must never be rejected just
+        because that raw pose sits inside an obstacle-clearance buffer (or,
+        in a pathological case, off the tracked grid entirely)."""
+        row, col = self.geometry.world_to_cell(*point)
+        row = min(max(row, 0), self.geometry.height - 1)
+        col = min(max(col, 0), self.geometry.width - 1)
+        if self.free_mask[row, col]:
+            return int(row), int(col)
+        if self._nearest_free_indices is None:
+            _, self._nearest_free_indices = distance_transform_edt(
+                ~self.free_mask, return_indices=True)
+        nearest_row, nearest_col = self._nearest_free_indices[:, row, col]
+        return int(nearest_row), int(nearest_col)
 
     def _cell_distances(self, start):
         cached = self._distances.get(start)
@@ -85,7 +104,7 @@ class SamplingDistanceOracle:
         if not targets:
             return ()
         first = (float(first[0]), float(first[1]))
-        origin = self._free_cell(first)
+        origin = self._nearest_free_cell(first)
         cells = [self._free_cell(point) for point in targets]
         if self._current_origin != origin:
             self._current_distances = self._compute_cell_distances(origin)
