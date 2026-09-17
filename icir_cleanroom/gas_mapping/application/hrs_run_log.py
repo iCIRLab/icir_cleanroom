@@ -11,6 +11,8 @@ import math
 from pathlib import Path
 import uuid
 
+from .hrs_methods import METHODS
+
 
 class HrsRunLog:
     def __init__(self, directory, time_basis):
@@ -41,7 +43,16 @@ class HrsRunLog:
             return
         self._clock(ros, wall)
         run = self.active
+        if kind == 'target_selected':
+            run['attempt_count'] += 1
+            if run['stage'] == 'SEARCH':
+                run['search_iterations'] += 1
+        if kind == 'navigation_attempt':
+            run['navigation_attempts'] += 1
         self._append('events.csv', dict(
+            schema_version=2, method_id=run['method_id'],
+            initial_selection=run['initial_selection'], search_method=run['search_method'],
+            stage=run['stage'],
             run_id=run['run_id'], event=kind, ros_seconds=ros,
             wall_elapsed_seconds=wall-run['start_wall'],
             utc=datetime.now(timezone.utc).isoformat(),
@@ -51,9 +62,13 @@ class HrsRunLog:
         if self.active is not None:
             raise RuntimeError('previous HRS record is still active')
         self.run_count += 1
+        method_id = parameters.get('method', 'M3')
+        method = METHODS[method_id]
         self.active = dict(
             run_id=f'{self.directory.name}_{self.run_count:04d}',
             event_id=event_id, lrs_lap=lrs_lap, source_start=source,
+            method_id=method_id, initial_selection=method.initial, search_method=method.search,
+            stage='INITIAL', attempt_count=0, search_iterations=0, navigation_attempts=0,
             parameters=parameters, start_ros=ros, start_wall=wall,
             last_ros=ros, last_wall=wall, first_ros=None, first_wall=None,
             last_measurement=None, measurement_count=0, clock_valid=True,
@@ -68,12 +83,20 @@ class HrsRunLog:
             self.event('measurement_failed', ros, wall, reason='nonfinite measurement')
             return
         run = self.active
-        if run['first_ros'] is None:
-            run['first_ros'], run['first_wall'] = ros, wall
         run['measurement_count'] += 1
         run['last_measurement'] = (float(xy[0]), float(xy[1]), float(value))
         self.event('measurement_complete', ros, wall, xy=xy, value=value,
                    sample_count=sample_count, measurement_count=run['measurement_count'])
+
+    def initial_complete(self, ros, wall):
+        if self.active is None or self.active['first_ros'] is not None:
+            return
+        run = self.active
+        if run['measurement_count'] == 0:
+            raise ValueError('initial stage needs a valid measurement')
+        run['first_ros'], run['first_wall'] = ros, wall
+        self.event('initial_gmrf_complete', ros, wall)
+        run['stage'] = 'SEARCH'
 
     def finish(self, ros, wall, *, outcome, reason, robot_xy, source_end):
         if self.active is None:
@@ -94,13 +117,18 @@ class HrsRunLog:
         def coord(xy, index):
             return None if xy is None else xy[index]
         row = dict(
-            run_id=run['run_id'], event_id=run['event_id'], lrs_lap=run['lrs_lap'],
+            schema_version=2, initial_boundary='first_valid_measurement_gmrf_complete',
+            method_id=run['method_id'], initial_selection=run['initial_selection'],
+            search_method=run['search_method'], final_stage=run['stage'],
+            attempt_count=run['attempt_count'], search_iterations=run['search_iterations'],
+            navigation_attempts=run['navigation_attempts'],            run_id=run['run_id'], event_id=run['event_id'], lrs_lap=run['lrs_lap'],
             start_utc=run['start_utc'], time_basis=self.time_basis,
             initial_seconds=initial if valid else None,
             search_seconds=search if valid else None,
             total_seconds=total if valid else None,
             wall_initial_seconds=wi, wall_search_seconds=ws, wall_total_seconds=wt,
-            initial_measurement_completed=first, ros_clock_valid=valid,
+            initial_measurement_completed=run['measurement_count'] > 0,
+            initial_update_completed=first, ros_clock_valid=valid,
             source_start_x=coord(run['source_start'], 0), source_start_y=coord(run['source_start'], 1),
             source_x=coord(source_end, 0), source_y=coord(source_end, 1),
             source_position_available=source_end is not None,
@@ -112,6 +140,8 @@ class HrsRunLog:
             gas_source_detected=outcome == 'detected',
             gas_source_measurement_failed=None if outcome == 'interrupted' else outcome == 'failed',
             termination_reason=reason, source_position_error=error,
+            final_position_error=(math.dist(robot_xy, source_end)
+                                  if robot_xy is not None and source_end is not None else None),
             parameters=json.dumps(run['parameters'], ensure_ascii=False, sort_keys=True))
         self.event('hrs_end', ros, wall, outcome=outcome, reason=reason, source=source_end)
         self._append('runs.csv', row)

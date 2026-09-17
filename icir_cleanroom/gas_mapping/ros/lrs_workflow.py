@@ -6,6 +6,7 @@ from ..models import PlanningKind
 from ..planning.lrs_priority import (
     history_adjusted_cycle, solve_lrs_priority_route)
 from .hrs_run_logging import record_hrs
+from ..application.hrs_methods import HrsSession
 
 
 class LrsWorkflow:
@@ -18,6 +19,8 @@ class LrsWorkflow:
         if not self.controller.base_lrs_goals or self.controller.latest_pose is None:
             return
         self.controller.orchestrator.begin_lrs_lap()
+        self.controller.lrs_measurement_start = len(self.controller.measurement_manager.measurements)
+        self.controller.hrs_session = None
         self.controller.publish_hrs_status()
 
         self.controller.gmrf.reset_observations()
@@ -170,6 +173,18 @@ class LrsWorkflow:
     def finish_lrs_navigation(self):
         if self.controller.lap_hazard_detected:
             record_hrs(self.controller, 'start')
+            manager = getattr(self.controller, 'measurement_manager', None)
+            measurements = () if manager is None else manager.measurements[
+                getattr(self.controller, 'lrs_measurement_start', 0):]
+            self.controller.hrs_session = HrsSession(
+                getattr(self.controller, 'method', 'M3'),
+                [m for m in measurements if m.phase == 'LRS'],
+                getattr(self.controller, 'spiral_step_cells', 1),
+                getattr(self.controller, 'spiral_recenter_epsilon', 0.),
+                getattr(self.controller, 'hrs_search_patience', 3),
+                getattr(self.controller, 'hrs_search_min_relative_improvement', 0.05))
+            if hasattr(self.controller, 'hrs_manager'):
+                self.controller.hrs_manager.reset_search()
         self.controller.returning = False
         self.controller.get_logger().info(
             f'=== LRS lap {self.controller.lrs_lap} 완료: '

@@ -24,6 +24,8 @@ def record_hrs(controller, kind, **details):
                            source=controller.hrs_log_source,
                            parameters=controller.config.flat_values())
             controller.get_logger().info(f'HRS results directory: {recorder.directory}')
+        elif kind == 'initial_complete':
+            recorder.initial_complete(ros, wall)
         elif kind == 'measurement':
             recorder.measurement(ros, wall, **details)
         elif kind == 'finish':

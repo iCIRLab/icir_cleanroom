@@ -91,11 +91,6 @@ class GasMappingControllerNode(Node):
     hrs_candidate_variables = StateField(
         'hrs_state', 'candidate_variables')
     hrs_gmrf_dirty = StateField('hrs_state', 'dirty')
-    hrs_confirmed_variable = StateField(
-        'hrs_state', 'confirmed_variable')
-    hrs_confirmed_value = StateField('hrs_state', 'confirmed_value')
-    hrs_confirmed_timestamp = StateField(
-        'hrs_state', 'confirmed_timestamp')
 
     source_transition_reason = StateField(
         'source_transition_state', 'reason')

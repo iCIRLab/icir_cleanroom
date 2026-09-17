@@ -33,7 +33,6 @@ def test_typed_config_round_trips_without_required_parameters():
     config = ControllerConfig.from_mapping(values)
     assert config.flat_values() == values
     assert config.hrs.hrs_distance_weight == 0.03
-    assert config.hrs.hrs_response_threshold == 0.9
     assert config.lrs.lrs_priority_count == 6
     assert config.gmrf.gabp_damping == 0.5
 
@@ -41,11 +40,6 @@ def test_typed_config_round_trips_without_required_parameters():
 def test_config_rejects_invalid_cross_field_values():
     values = controller_values()
     values['lrs_priority_count'] = values['lrs_priority_candidate_count'] + 1
-    with pytest.raises(ValueError):
-        ControllerConfig.from_mapping(values)
-
-    values = controller_values()
-    values['hrs_response_threshold'] = 1.01
     with pytest.raises(ValueError):
         ControllerConfig.from_mapping(values)
 
@@ -85,9 +79,7 @@ def test_runtime_reset_methods_advance_or_clear_owned_state():
         cycles=3, active_target=object(), failure_counts={7: 2},
         route_targets=[object()], active_region_cells={(1, 2)},
         completed_region_cells={(3, 4)}, region_ascent_floor=0.4,
-        unreachable_variables={7}, candidate_variables={1, 7}, dirty=True,
-        confirmed_variable=2, confirmed_value=0.9,
-        confirmed_timestamp=12.0)
+        unreachable_variables={7}, candidate_variables={1, 7}, dirty=True)
     hrs.reset_search()
     assert hrs.cycles == 0
     assert hrs.active_target is None
@@ -99,9 +91,6 @@ def test_runtime_reset_methods_advance_or_clear_owned_state():
     assert hrs.unreachable_variables == set()
     assert hrs.candidate_variables == set()
     assert hrs.dirty is False
-    assert hrs.confirmed_variable is None
-    assert hrs.confirmed_value is None
-    assert hrs.confirmed_timestamp is None
 
 
 def test_orchestrator_tracks_sampled_event_measurements():
@@ -117,14 +106,8 @@ def test_orchestrator_tracks_sampled_event_measurements():
 
 
 @pytest.mark.parametrize(
-    ('value', 'expected'), [(0.4999, False), (0.5, True), (0.8, True)])
-def test_hrs_response_threshold_is_inclusive(value, expected):
-    assert HrsManager.reached_response_threshold(value, 0.5) is expected
-
-
-@pytest.mark.parametrize(
     ('completed_cycles', 'repeat', 'expected_action'),
-    [(0, True, 'replan'), (9, True, 'return'),
+    [(0, True, 'replan'), (9, True, 'transition'),
      (0, False, 'replan'), (9, False, 'complete')])
 def test_adaptive_hrs_cycle_replans_until_maximum(
         completed_cycles, repeat, expected_action):
@@ -137,10 +120,6 @@ def test_adaptive_hrs_cycle_replans_until_maximum(
         hrs_cycles=completed_cycles,
         hrs_cycles_in_alert=completed_cycles,
         hrs_max_cycles_per_alert=10,
-        hrs_response_threshold=0.5,
-        hrs_confirmed_variable=None,
-        hrs_confirmed_value=None,
-        hrs_confirmed_timestamp=None,
         get_clock=lambda: SimpleNamespace(
             now=lambda: SimpleNamespace(nanoseconds=1_000_000_000)),
         get_logger=lambda: SimpleNamespace(
@@ -149,7 +128,7 @@ def test_adaptive_hrs_cycle_replans_until_maximum(
         publish_hrs_status=lambda: events.append('publish'),
         persist_history=lambda reason: events.append('persist'),
         start_hrs_planning=lambda: events.append('replan'),
-        return_to_lrs=lambda reason: events.append('return'),
+        start_source_transition=lambda reason: events.append('transition'),
         complete_mapping=lambda reason: events.append('complete'))
 
     HrsWorkflow(controller).finish_hrs_cycle()
@@ -158,43 +137,6 @@ def test_adaptive_hrs_cycle_replans_until_maximum(
     expected = ['finalize', 'publish', 'persist']
     expected.append(expected_action)
     assert events == expected
-
-
-@pytest.mark.parametrize('repeat', [True, False])
-def test_goal_response_terminates_hrs_immediately(repeat):
-    events = []
-    history = SimpleNamespace(record_confirmed_event=lambda *args, **kwargs:
-                              events.append(('record', args, kwargs)) or True)
-    controller = SimpleNamespace(
-        repeat_after_hrs=repeat,
-        hrs_response_threshold=0.5,
-        hrs_manager=HrsManager(),
-        gmrf=SimpleNamespace(var_cells=[(2, 3)]),
-        history=history,
-        current_event_id='event-1',
-        hrs_confirmed_variable=None,
-        hrs_confirmed_value=None,
-        hrs_confirmed_timestamp=None,
-        get_logger=lambda: SimpleNamespace(
-            warning=lambda message: events.append('warning'),
-            error=lambda message: events.append('error'),
-            info=lambda message: events.append('info')),
-        publish_history=lambda: events.append('publish'),
-        persist_history=lambda reason: events.append('persist') or True,
-        start_source_transition=lambda reason: events.append('transition'),
-        complete_mapping=lambda reason: events.append('complete'))
-
-    workflow = HrsWorkflow(controller)
-    assert not workflow.confirm_hrs_response(0, 0.4999, 10.0)
-    assert workflow.confirm_hrs_response(0, 0.5, 11.0)
-    assert controller.hrs_confirmed_variable == 0
-    assert controller.hrs_confirmed_value == 0.5
-
-    record = next(event for event in events
-                  if isinstance(event, tuple) and event[0] == 'record')
-    assert record[1][0:6] == ('event-1', 2, 3, 0.5, 0.5, 11.0)
-    assert events[-4:] == ['publish', 'persist', 'warning',
-                           'transition' if repeat else 'complete']
 
 
 def test_hrs_navigation_never_visits_a_frozen_second_target():
@@ -250,7 +192,6 @@ def test_subgoal_hrs_dwell_updates_gmrf_and_continues():
         hrs_cycles_in_alert=0,
         hrs_max_cycles_per_alert=10,
         current_index=0,
-        hrs_response_threshold=0.5,
         hrs_manager=SimpleNamespace(
             record_success=lambda variable: events.append('success')),
         hrs_gmrf_dirty=False,
@@ -263,16 +204,13 @@ def test_subgoal_hrs_dwell_updates_gmrf_and_continues():
         update_gmrf=lambda reason, compare_with_cg=False:
             events.append('gmrf_update') or True,
         publish_measurements=lambda: events.append('publish_measurements'),
-        confirm_hrs_response=lambda variable, measured, timestamp:
-            False,
         get_clock=lambda: SimpleNamespace(
             now=lambda: SimpleNamespace(nanoseconds=1_000_000_000)),
         finalize_hrs_gmrf_batch=lambda reason:
             events.append('gmrf_finalize') or True,
         publish_hrs_status=lambda: events.append('status'),
         persist_history=lambda reason: events.append('persist'),
-        start_hrs_planning=lambda: events.append('recompute'),
-        return_to_lrs=lambda reason: events.append('return'))
+        start_hrs_planning=lambda: events.append('recompute'))
     controller.advance_after_target = (
         lambda: HrsWorkflow(controller).finish_hrs_cycle())
 
@@ -286,7 +224,7 @@ def test_subgoal_hrs_dwell_updates_gmrf_and_continues():
     assert events[-1] == 'recompute'
 
 
-def test_hrs_cycle_returns_to_lrs_when_gmrf_recovery_fails():
+def test_hrs_cycle_advances_source_when_gmrf_recovery_fails():
     events = []
     controller = SimpleNamespace(
         repeat_after_hrs=True,
@@ -296,10 +234,6 @@ def test_hrs_cycle_returns_to_lrs_when_gmrf_recovery_fails():
         hrs_cycles=0,
         hrs_cycles_in_alert=0,
         hrs_max_cycles_per_alert=10,
-        hrs_response_threshold=0.5,
-        hrs_confirmed_variable=None,
-        hrs_confirmed_value=None,
-        hrs_confirmed_timestamp=None,
         get_clock=lambda: SimpleNamespace(
             now=lambda: SimpleNamespace(nanoseconds=1_000_000_000)),
         get_logger=lambda: SimpleNamespace(
@@ -307,14 +241,14 @@ def test_hrs_cycle_returns_to_lrs_when_gmrf_recovery_fails():
         finalize_hrs_gmrf_batch=lambda reason: False,
         publish_hrs_status=lambda: events.append('publish'),
         persist_history=lambda reason: events.append('persist'),
-        return_to_lrs=lambda reason: events.append('return'))
+        start_source_transition=lambda reason: events.append('transition'))
 
     HrsWorkflow(controller).finish_hrs_cycle()
 
-    assert events == ['publish', 'persist', 'return']
+    assert events == ['publish', 'persist', 'transition']
 
 
-def test_hrs_planning_returns_to_lrs_when_candidates_are_exhausted():
+def test_hrs_planning_advances_source_when_candidates_are_exhausted():
     events = []
     controller = SimpleNamespace(
         repeat_after_hrs=True,
@@ -329,9 +263,6 @@ def test_hrs_planning_returns_to_lrs_when_candidates_are_exhausted():
         hrs_active_region_cells=set(),
         hrs_completed_region_cells=set(),
         hrs_region_ascent_floor=None,
-        hrs_confirmed_variable=None,
-        hrs_confirmed_value=None,
-        hrs_confirmed_timestamp=None,
         hrs_manager=HrsManager(),
         sampling_distance=SimpleNamespace(
             distances_from=lambda first, targets: tuple(math.dist(first, point) for point in targets),
@@ -345,8 +276,7 @@ def test_hrs_planning_returns_to_lrs_when_candidates_are_exhausted():
             info=lambda message: events.append('info'),
             error=lambda message: events.append('error'),
             warning=lambda message: events.append('warning')),
-        hrs_response_threshold=0.5,
-        return_to_lrs=lambda reason: events.append(reason))
+        start_source_transition=lambda reason: events.append(reason))
 
     HrsWorkflow(controller).start_hrs_planning()
 
@@ -429,8 +359,7 @@ def test_each_completed_measurement_discards_route_and_replans():
         finalize_hrs_gmrf_batch=lambda reason: events.append('gmrf') or True,
         publish_hrs_status=lambda: events.append('status'),
         persist_history=lambda reason: events.append('history'),
-        start_hrs_planning=lambda: events.append('recompute'),
-        return_to_lrs=lambda reason: events.append('return'))
+        start_hrs_planning=lambda: events.append('recompute'))
 
     HrsWorkflow(controller).finish_hrs_cycle()
 
@@ -454,12 +383,12 @@ def test_repeat_after_hrs_requires_boolean(value):
 
 @pytest.mark.parametrize('repeat', [True, False])
 @pytest.mark.parametrize('reason', ['no candidates', 'GMRF update failed', 'maximum measurements reached'])
-def test_hrs_end_repeat_policy_for_non_success(repeat, reason):
+def test_hrs_end_repeat_policy(repeat, reason):
     calls = []
     controller = SimpleNamespace(
         repeat_after_hrs=repeat,
         get_logger=lambda: SimpleNamespace(warning=lambda msg: None),
-        return_to_lrs=lambda msg: calls.append(('repeat', msg)),
+        start_source_transition=lambda msg: calls.append(('transition', msg)),
         complete_mapping=lambda msg: calls.append(('complete', msg)))
     HrsWorkflow(controller).finish_hrs_search(reason)
-    assert calls == [('repeat' if repeat else 'complete', 'HRS terminated: '+reason)]
+    assert calls == [('transition' if repeat else 'complete', 'HRS terminated: '+reason)]

@@ -8,7 +8,7 @@ from icir_cleanroom.gas_mapping.ros.hrs_run_logging import record_hrs, source_po
 def begin(tmp_path, source=(2., 3.)):
     log = HrsRunLog(tmp_path, 'ros_simulation')
     log.start(100., 1000., event_id='event-1', lrs_lap=1,
-              source=source, parameters={'hrs_response_threshold': .9})
+              source=source, parameters={'hrs_search_patience': 10})
     return log
 
 
@@ -21,9 +21,10 @@ def test_time_split_includes_selection_navigation_and_first_dwell(tmp_path):
     log = begin(tmp_path)
     log.event('target_selected', 102., 1003., x=2., y=3.)
     log.measurement(110., 1012., xy=(2.1, 3.), value=.91, sample_count=20)
+    log.initial_complete(112., 1015.)
     row = finish(log)
-    assert (row['initial_seconds'], row['search_seconds'], row['total_seconds']) == (10., 10., 20.)
-    assert (row['wall_initial_seconds'], row['wall_search_seconds'], row['wall_total_seconds']) == (12., 18., 30.)
+    assert (row['initial_seconds'], row['search_seconds'], row['total_seconds']) == (12., 8., 20.)
+    assert (row['wall_initial_seconds'], row['wall_search_seconds'], row['wall_total_seconds']) == (15., 15., 30.)
     assert row['source_position_error'] == pytest.approx(.1)
     assert row['gas_source_detected'] and not row['gas_source_measurement_failed']
     assert row['estimated_source_x'] == 2.1
@@ -32,13 +33,14 @@ def test_time_split_includes_selection_navigation_and_first_dwell(tmp_path):
     assert float(rows[0]['total_seconds']) == float(rows[0]['initial_seconds'])+float(rows[0]['search_seconds'])
     assert rows[0]['outcome'] == row['outcome']
     events = list(csv.DictReader((log.directory/'events.csv').open()))
-    assert [e['event'] for e in events] == ['lrs_complete_hrs_start', 'target_selected', 'measurement_complete', 'hrs_end']
+    assert [e['event'] for e in events] == ['lrs_complete_hrs_start', 'target_selected', 'measurement_complete', 'initial_gmrf_complete', 'hrs_end']
     assert finish(log) is None  # source transition/shutdown cannot duplicate row
 
 
 def test_first_measurement_success_has_zero_search_if_decision_is_immediate(tmp_path):
     log=begin(tmp_path)
     log.measurement(120., 1030., xy=(2.,3.), value=1., sample_count=20)
+    log.initial_complete(120., 1030.)
     row=finish(log)
     assert row['initial_seconds']==20. and row['search_seconds']==0.
 
@@ -123,26 +125,23 @@ def test_source_marker_delete_and_wrong_frame_are_not_real_sources():
     source_position(c,marker);assert c.hrs_log_source is None
 
 
-def test_success_is_saved_before_source_transition(tmp_path):
+def test_finish_hrs_search_saves_row_before_advancing_source(tmp_path):
     from icir_cleanroom.gas_mapping.ros.hrs_workflow import HrsWorkflow
-    from icir_cleanroom.gas_mapping.application.hrs import HrsManager
     log=begin(tmp_path)
     log.measurement(110., 1010., xy=(2.1,3.), value=.95, sample_count=20)
     calls=[]
     c=NS(hrs_run_log=log,hrs_log_source=(2.,3.),latest_pose=NS(pose=NS(position=NS(x=2.1,y=3.))),
          get_clock=lambda:NS(now=lambda:NS(nanoseconds=120_000_000_000)),
          get_logger=lambda:NS(info=lambda msg:None,warning=lambda msg:None,error=lambda msg:None),
-         hrs_response_threshold=.9,hrs_manager=HrsManager(),gmrf=NS(var_cells=[(0,0)]),
-         history=NS(record_confirmed_event=lambda *args,**kwargs:True),current_event_id='event-1',
-         publish_history=lambda:None,persist_history=lambda msg:True,repeat_after_hrs=True)
-    def transition(reason):
+         repeat_after_hrs=True)
+    def start_source_transition(reason):
         assert log.active is None
         row=next(csv.DictReader((log.directory/'runs.csv').open()))
-        assert row['source_x']=='2.0' and row['outcome']=='detected'
+        assert row['source_x']=='2.0' and row['outcome']=='failed'
         c.hrs_log_source=(99.,99.)
         calls.append('transition')
-    c.start_source_transition=transition
-    assert HrsWorkflow(c).confirm_hrs_response(0,.95,0.)
+    c.start_source_transition=start_source_transition
+    HrsWorkflow(c).finish_hrs_search('no relative improvement in 10 consecutive HRS attempts')
     assert calls==['transition']
 
 

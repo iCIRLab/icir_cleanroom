@@ -4,7 +4,7 @@ from std_srvs.srv import Trigger
 
 
 class SourceTransitionWorkflow:
-    METHODS = ['start_source_transition','source_advance_response','source_advance_timed_out','cancel_source_advance_timeout','finish_source_transition','return_to_lrs']
+    METHODS = ['start_source_transition','source_advance_response','source_advance_timed_out','cancel_source_advance_timeout','finish_source_transition']
 
     def __init__(self, controller):
         self.controller = controller
@@ -18,7 +18,7 @@ class SourceTransitionWorkflow:
             return
 
         self.controller.get_logger().info(
-            f'HRS 대응 임계값 검출 후 가스원 전환: {reason}')
+            f'HRS 종료 후 가스원 전환: {reason}')
         self.controller.commit_history_snapshot(
             f'confirmed hazard event ending after LRS lap {self.controller.lrs_lap}')
         self.controller.active_hrs_target = None
@@ -134,17 +134,6 @@ class SourceTransitionWorkflow:
                   'existing source event')
         self.controller.start_lrs_lap(
             f'{reason}; source_transition={outcome}; using {status}')
-
-    def return_to_lrs(self, reason):
-        self.controller.get_logger().info(f'HRS 종료 후 LRS 복귀: {reason}')
-        self.controller.commit_history_snapshot(
-            f'hazard event ending after LRS lap {self.controller.lrs_lap}')
-        self.controller.active_hrs_target = None
-        self.controller.hrs_route_targets = []
-        self.controller.publish_empty_hrs_route()
-        self.controller.clear_hrs_candidates()
-
-        self.controller.start_lrs_lap(reason)
 
 
 __all__ = ['SourceTransitionWorkflow']

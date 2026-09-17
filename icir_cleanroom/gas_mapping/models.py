@@ -100,9 +100,6 @@ class HrsRuntimeState:
     unreachable_variables: Set[int] = field(default_factory=set)
     candidate_variables: Set[int] = field(default_factory=set)
     dirty: bool = False
-    confirmed_variable: Optional[int] = None
-    confirmed_value: Optional[float] = None
-    confirmed_timestamp: Optional[float] = None
 
     def reset_search(self):
         self.active_target = None
@@ -117,9 +114,6 @@ class HrsRuntimeState:
         self.unreachable_variables.clear()
         self.candidate_variables.clear()
         self.dirty = False
-        self.confirmed_variable = None
-        self.confirmed_value = None
-        self.confirmed_timestamp = None
 
 
 @dataclass

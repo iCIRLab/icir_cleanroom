@@ -119,15 +119,5 @@ class HrsManager:
             candidate.row, candidate.col, candidate.variable))
         return scored, selected
 
-    @staticmethod
-    def reached_response_threshold(value, threshold):
-        value = float(value)
-        threshold = float(threshold)
-        if not math.isfinite(value):
-            raise ValueError('measured value must be finite')
-        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
-            raise ValueError('response threshold must be in [0, 1]')
-        return value >= threshold
-
 
 __all__ = ['HrsCandidate', 'HrsManager']

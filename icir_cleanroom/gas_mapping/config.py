@@ -36,11 +36,15 @@ class DisplayConfig:
 
 @dataclass(frozen=True)
 class HrsConfig:
+    method: str = 'M3'
+    spiral_step_cells: int = 1
+    spiral_recenter_epsilon: float = 0.0
+    hrs_search_patience: int = 3
+    hrs_search_min_relative_improvement: float = 0.05
     repeat_after_hrs: bool = True
     hrs_results_directory: str = '~/.ros/icir_cleanroom/hrs_results'
     hrs_ucb_k: float = 0.2
     hrs_distance_weight: float = 0.03
-    hrs_response_threshold: float = 0.90
     hrs_max_cycles_per_alert: int = 10
     hazard_threshold: float = 0.2
 
@@ -120,6 +124,22 @@ class ControllerConfig:
     def validate(self):
         nav, gmrf, hrs = self.navigation, self.gmrf, self.hrs
         lrs, history = self.lrs, self.history
+        from .application.hrs_methods import METHODS
+        if hrs.method not in METHODS:
+            raise ValueError('method must be M1 through M7')
+        if (isinstance(hrs.spiral_step_cells, bool) or
+                not isinstance(hrs.spiral_step_cells, int) or hrs.spiral_step_cells < 1):
+            raise ValueError('spiral_step_cells must be a positive integer')
+        if (not math.isfinite(hrs.spiral_recenter_epsilon) or
+                hrs.spiral_recenter_epsilon < 0):
+            raise ValueError('spiral_recenter_epsilon must be finite and nonnegative')
+        if (isinstance(hrs.hrs_search_patience, bool) or
+                not isinstance(hrs.hrs_search_patience, int) or hrs.hrs_search_patience < 1):
+            raise ValueError('hrs_search_patience must be a positive integer')
+        if (not math.isfinite(hrs.hrs_search_min_relative_improvement) or
+                hrs.hrs_search_min_relative_improvement < 0):
+            raise ValueError(
+                'hrs_search_min_relative_improvement must be finite and nonnegative')
         if not isinstance(hrs.repeat_after_hrs, bool):
             raise ValueError('repeat_after_hrs must be a boolean')
         if not isinstance(hrs.hrs_results_directory, str) or not hrs.hrs_results_directory.strip():
@@ -174,8 +194,6 @@ class ControllerConfig:
             raise ValueError(
                 'hrs_distance_weight must be finite and non-negative')
 
-        if not 0.0 <= float(hrs.hrs_response_threshold) <= 1.0:
-            raise ValueError('hrs_response_threshold must be in [0, 1]')
         if int(hrs.hrs_max_cycles_per_alert) <= 0:
             raise ValueError('hrs_max_cycles_per_alert must be positive')
         if (float(history.history_merge_radius) < 0.0 or

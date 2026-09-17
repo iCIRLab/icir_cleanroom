@@ -54,6 +54,8 @@ class NavigationWorkflow:
         self.controller.get_logger().info(
             f'{label} -> ({target.pose.position.x:.2f}, '
             f'{target.pose.position.y:.2f})')
+        if self.controller.phase == 'HRS_NAVIGATION':
+            record_hrs(self.controller, 'navigation_attempt')
         goal_generation = self.controller.navigation_manager.issue_goal()
         self.controller.nav2.send(
             goal_pose, goal_generation, self.controller.navigation_succeeded,
@@ -106,14 +108,16 @@ class NavigationWorkflow:
         self.controller.dwell_timer = None
         if result.phase != self.controller.phase:
             return
+        valid_measurement = (result.mean is not None and all(math.isfinite(v) for v in
+            (result.mean, result.pose.pose.position.x, result.pose.pose.position.y)))
         if self.controller.phase == 'HRS_NAVIGATION':
-            if result.mean is None:
-                record_hrs(self.controller, 'measurement_failed', reason='no_sensor_samples')
+            if not valid_measurement:
+                record_hrs(self.controller, 'measurement_failed', reason='missing_or_nonfinite_sensor_samples')
             else:
                 record_hrs(self.controller, 'measurement',
                            xy=(result.pose.pose.position.x, result.pose.pose.position.y),
                            value=result.mean, sample_count=result.sample_count)
-        if result.mean is None:
+        if not valid_measurement:
             self.controller.get_logger().warning(
                 '농도 표본이 없어 이 포인트를 미측정으로 남깁니다')
             if self.controller.phase == 'HRS_NAVIGATION':
@@ -161,25 +165,30 @@ class NavigationWorkflow:
                         compare_with_cg=False):
                     self.controller.hrs_gmrf_dirty = False
                 else:
-                    self.controller.get_logger().warning(
-                        'HRS 지점별 GaBP 갱신을 다음 측정 또는 '
-                        '배치 종료 시 재시도합니다')
+                    if not self.controller.finalize_hrs_gmrf_batch('HRS measurement recovery'):
+                        self.controller.finish_hrs_search('GMRF update failed')
+                        return
+                session = getattr(self.controller, 'hrs_session', None)
+                if session is not None:
+                    was_initial = session.stage == 'INITIAL'
+                    changed = session.updated(variable, value, self.controller.gmrf)
+                    if was_initial:
+                        record_hrs(self.controller, 'initial_complete')
+                    if changed:
+                        record_hrs(self.controller, 'spiral_center_changed',
+                                   cell=session.spiral.center, value=session.spiral.value)
+                else:
+                    record_hrs(self.controller, 'initial_complete')
                 self.controller.get_logger().info(
                     f'HRS actual measurement: target_variable='
                     f'{planned.variable}, measured_variable={variable}, '
-                    f'value={value:.6f}, '
-                    f'T_goal_concentration='
-                    f'{float(self.controller.hrs_response_threshold):.6f}')
+                    f'value={value:.6f}')
             self.controller.publish_measurements()
             self.controller.get_logger().info(
                 f'측정 완료: phase={self.controller.phase}, '
                 f'pose=({pose.position.x:.3f},{pose.position.y:.3f}), '
                 f'mean={value:.4f}, samples={result.sample_count}, '
                 f'cell=({row},{col})')
-            if (self.controller.phase == 'HRS_NAVIGATION' and
-                    self.controller.confirm_hrs_response(
-                        variable, value, measurement.timestamp)):
-                return
         self.controller.advance_after_target()
 
     def navigation_failed(self, reason):

@@ -18,10 +18,15 @@ gas_mapping_controller_node:
     gabp_damping: 0.5
     gabp_retry_damping: 0.25
     gabp_cg_warning_tolerance: 1.0e-4
+    # Launch argument method overrides the node default (M3).
+    method: M3
+    spiral_step_cells: 1
+    spiral_recenter_epsilon: 0.0
+    hrs_search_patience: 10
+    hrs_search_min_relative_improvement: 0.0
     hrs_ucb_k: 0.2
-    hrs_distance_weight: 0.03
-    hrs_response_threshold: 0.98
-    hrs_max_cycles_per_alert: 30
+    hrs_distance_weight: 0.1
+    hrs_max_cycles_per_alert: 100
     repeat_after_hrs: true
     hrs_results_directory: ~/.ros/icir_cleanroom/hrs_results
     hazard_threshold: 0.15

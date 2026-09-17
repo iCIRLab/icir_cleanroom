@@ -38,7 +38,7 @@ def test_manifest_matches_controller_publishers_and_parameter_count():
     actual_topics = {topic for _, _, topic in PUBLISHER_SPECS}
     assert actual_topics == expected_topics
     assert len(PUBLISHER_SPECS) == 28
-    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 41
+    assert len(DEFAULT_CONTROLLER_PARAMETERS) == 45
 
 
 def test_scripts_are_logic_free_compatible_entrypoints():
