@@ -8,6 +8,7 @@ import pytest
 
 from icir_cleanroom.gas_mapping.environment import (
     generate_random_source_state, load_source_state, save_source_state,
+    random_source_is_lrs_detectable, validated_random_source_config,
     validated_source_state)
 from icir_cleanroom.gas_mapping.history import GasHistoryStore
 
@@ -122,8 +123,42 @@ def test_source_state_round_trip_and_seeded_generation(tmp_path):
         for y in range(-5, 6) for x in range(-5, 6)]
     first = generate_random_source_state(
         random.Random(7), -5, 5, -5, 5, 1.0,
-        1.0, 2.0, 0.0, 0.1, sampling_points)
+        1.0, 2.0, 1.0, 1.0, 0.0, 0.1, sampling_points)
     second = generate_random_source_state(
         random.Random(7), -5, 5, -5, 5, 1.0,
-        1.0, 2.0, 0.0, 0.1, sampling_points)
+        1.0, 2.0, 1.0, 1.0, 0.0, 0.1, sampling_points)
     assert first == second
+
+
+def test_random_source_strength_is_drawn_within_the_configured_range():
+    sampling_points = [
+        (float(x), float(y))
+        for y in range(-5, 6) for x in range(-5, 6)]
+    strengths = [
+        generate_random_source_state(
+            random.Random(seed), -5, 5, -5, 5, 1.0,
+            1.0, 2.0, 0.5, 1.0, 0.0, 0.1, sampling_points)['source_strength']
+        for seed in range(30)]
+    assert all(0.5 <= value <= 1.0 for value in strengths)
+    assert len(set(strengths)) > 1  # actually varies, not pinned to one end
+
+
+def test_detectability_scales_with_source_strength():
+    weak = {'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0,
+            'source_strength': 0.5}
+    strong = {'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0,
+              'source_strength': 1.0}
+    point = [(4.0, 5.0)]  # exp(-0.5) =~ 0.6065 before strength scaling
+    assert random_source_is_lrs_detectable(strong, 0.55, point)
+    assert not random_source_is_lrs_detectable(weak, 0.55, point)
+
+
+def test_random_source_config_rejects_an_inverted_strength_range():
+    config = dict(
+        source_mode='random_after_peak', source_random_seed=1,
+        source_random_sigma_min=1.0, source_random_sigma_max=2.0,
+        source_random_strength_min=0.9, source_random_strength_max=0.5,
+        source_random_min_separation=0.0,
+        source_random_detection_threshold=0.1)
+    with pytest.raises(ValueError, match='strength'):
+        validated_random_source_config(config)

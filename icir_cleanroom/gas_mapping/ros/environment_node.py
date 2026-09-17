@@ -47,6 +47,8 @@ class GasEnvironmentNode(Node):
             'source_random_seed': -1,
             'source_random_sigma_min': 4.0,
             'source_random_sigma_max': 7.0,
+            'source_random_strength_min': 1.0,
+            'source_random_strength_max': 1.0,
             'source_random_min_separation': 10.0,
             'lrs_cluster_count': 36,
             'lrs_cluster_random_seed': 0,
@@ -186,10 +188,14 @@ class GasEnvironmentNode(Node):
                 proposed, self.map_min_x, self.map_max_x,
                 self.map_min_y, self.map_max_y)
             if self.source_mode in AUTOMATIC_SOURCE_MODES:
-                if (not proposed['source_enabled']
-                        or proposed['source_strength'] != 1.0):
+                if not proposed['source_enabled']:
+                    raise ValueError('random source must be enabled')
+                if not (
+                        self.source_random_strength_min
+                        <= proposed['source_strength']
+                        <= self.source_random_strength_max):
                     raise ValueError(
-                        'random source must be enabled with strength 1.0')
+                        'random source strength is outside the configured range')
                 if not (
                         self.source_random_sigma_min
                         <= proposed['source_sigma']
@@ -247,6 +253,8 @@ class GasEnvironmentNode(Node):
                 self.gmrf_resolution,
                 self.source_random_sigma_min,
                 self.source_random_sigma_max,
+                self.source_random_strength_min,
+                self.source_random_strength_max,
                 self.source_random_detection_threshold,
                 self.source_hotspot_centers,
                 self.source_hotspot_weights,
@@ -259,6 +267,8 @@ class GasEnvironmentNode(Node):
             self.gmrf_resolution,
             self.source_random_sigma_min,
             self.source_random_sigma_max,
+            self.source_random_strength_min,
+            self.source_random_strength_max,
             self.source_random_min_separation,
             self.source_random_detection_threshold,
             self.source_detection_points,

@@ -382,7 +382,8 @@ def test_hrs_candidate_route_distance_tie_uses_stable_cell_order(
 
 def test_source_detectability_uses_accessible_sampling_points_only():
     source = {
-        'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0}
+        'source_x': 5.0, 'source_y': 5.0, 'source_sigma': 1.0,
+        'source_strength': 1.0}
     assert not random_source_is_lrs_detectable(
         source, 0.2, sampling_points=[(0.0, 0.0)])
     assert random_source_is_lrs_detectable(

@@ -12,6 +12,7 @@ SOURCE_PARAMETER_NAMES = (
 RANDOM_SOURCE_PARAMETER_NAMES = (
     'source_mode', 'source_random_seed',
     'source_random_sigma_min', 'source_random_sigma_max',
+    'source_random_strength_min', 'source_random_strength_max',
     'source_random_min_separation', 'source_random_detection_threshold',
 )
 HOTSPOT_SOURCE_PARAMETER_NAMES = (
@@ -75,16 +76,23 @@ def validated_random_source_config(config):
         raise ValueError('source_random_seed must be an integer')
     sigma_min = float(config['source_random_sigma_min'])
     sigma_max = float(config['source_random_sigma_max'])
+    strength_min = float(config['source_random_strength_min'])
+    strength_max = float(config['source_random_strength_max'])
     min_separation = float(config['source_random_min_separation'])
     detection_threshold = float(
         config['source_random_detection_threshold'])
     numeric_values = (
-        sigma_min, sigma_max, min_separation, detection_threshold)
+        sigma_min, sigma_max, strength_min, strength_max,
+        min_separation, detection_threshold)
     if not all(math.isfinite(value) for value in numeric_values):
         raise ValueError('random source numeric parameters must be finite')
     if sigma_min <= 0.0 or sigma_max < sigma_min:
         raise ValueError(
             'source random sigma range must satisfy 0 < min <= max')
+    if not 0.0 <= strength_min <= strength_max <= 1.0:
+        raise ValueError(
+            'source random strength range must satisfy '
+            '0 <= min <= max <= 1')
     if min_separation < 0.0:
         raise ValueError('source_random_min_separation must be non-negative')
     if not 0.0 <= detection_threshold <= 1.0:
@@ -95,6 +103,8 @@ def validated_random_source_config(config):
         'source_random_seed': seed,
         'source_random_sigma_min': sigma_min,
         'source_random_sigma_max': sigma_max,
+        'source_random_strength_min': strength_min,
+        'source_random_strength_max': strength_max,
         'source_random_min_separation': min_separation,
         'source_random_detection_threshold': detection_threshold,
     }
@@ -153,7 +163,7 @@ def random_source_is_lrs_detectable(
         distance_sq = (
             (x - state['source_x']) ** 2
             + (y - state['source_y']) ** 2)
-        concentration = math.exp(
+        concentration = state['source_strength'] * math.exp(
             -distance_sq / (2.0 * state['source_sigma'] ** 2))
         if concentration >= detection_threshold:
             return True
@@ -162,7 +172,8 @@ def random_source_is_lrs_detectable(
 
 def generate_random_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
-        sigma_min, sigma_max, min_separation, detection_threshold,
+        sigma_min, sigma_max, strength_min, strength_max,
+        min_separation, detection_threshold,
         sampling_points, previous_position=None,
         max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
     x_centers = inclusive_axis(min_x, max_x, gmrf_resolution)
@@ -173,7 +184,7 @@ def generate_random_source_state(
             'source_enabled': True,
             'source_x': float(rng.choice(x_centers)),
             'source_y': float(rng.choice(y_centers)),
-            'source_strength': 1.0,
+            'source_strength': float(rng.uniform(strength_min, strength_max)),
             'source_sigma': float(rng.uniform(sigma_min, sigma_max)),
         }
         if previous_position is not None:
@@ -201,7 +212,7 @@ def snap_to_grid(value, minimum, resolution):
 
 def generate_recurrent_hotspot_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
-        sigma_min, sigma_max, detection_threshold,
+        sigma_min, sigma_max, strength_min, strength_max, detection_threshold,
         hotspot_centers, hotspot_weights, hotspot_jitter_sigma,
         sampling_points, max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
     hotspots = [
@@ -219,7 +230,7 @@ def generate_recurrent_hotspot_source_state(
             'source_y': snap_to_grid(
                 rng.gauss(center_y, hotspot_jitter_sigma),
                 min_y, gmrf_resolution),
-            'source_strength': 1.0,
+            'source_strength': float(rng.uniform(strength_min, strength_max)),
             'source_sigma': float(rng.uniform(sigma_min, sigma_max)),
         }
         if not (

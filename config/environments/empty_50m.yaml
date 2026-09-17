@@ -14,6 +14,8 @@ gas_environment:
   source_random_seed: -1
   source_random_sigma_min: 4.0
   source_random_sigma_max: 7.0
+  source_random_strength_min: 0.5
+  source_random_strength_max: 1.0
   source_random_min_separation: 0.0
   source_random_detection_threshold: 0.2
   source_hotspot_centers: [10.0, 10.0, 40.0, 10.0, 15.0, 40.0, 40.0, 40.0]
