@@ -100,6 +100,17 @@ Visualization Manager:
       Enabled: false
       Name: HRSPotentialUCBValues
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/ucb_labels}
+    - Alpha: 0.62
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: true
+      Name: HRSDDUCBScore
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dducb}
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: false
+      Name: HRSDDUCBScoreValues
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/dducb_labels}
     - Alpha: 0.55
       Class: rviz_default_plugins/Map
       Color Scheme: costmap
@@ -200,6 +211,10 @@ Visualization Manager:
       Enabled: true
       Name: HRSEstimatedSource
       Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/estimated_source}
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: HRSEvaluationReference
+      Topic: {Depth: 1, Durability Policy: Transient Local, Reliability Policy: Reliable, Value: /gas_mapping/hrs/evaluation_reference}
     - Class: rviz_default_plugins/RobotModel
       Description Source: Topic
       Description Topic: {Depth: 5, Durability Policy: Volatile, Reliability Policy: Reliable, Value: /robot_description}
@@ -221,10 +236,10 @@ Visualization Manager:
     Current:
       Class: rviz_default_plugins/TopDownOrtho
       Name: TopDown
-      Scale: 14
+      Scale: 85
       Target Frame: map
-      X: 25
-      Y: 25
+      X: 0
+      Y: 0
 Window Geometry:
   Height: 900
   Width: 1400

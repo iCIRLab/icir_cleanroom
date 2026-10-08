@@ -13,6 +13,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from ..mapping.field_projection import (
     logarithmic_display as transform_logarithmic_display, project_field)
 from ..planning.hrs_policy import normalized_ucb
+from .evaluation_markers import evaluation_markers
 
 
 PUBLISHER_SPECS = (
@@ -23,6 +24,8 @@ PUBLISHER_SPECS = (
     ('variance_labels_pub', MarkerArray, '/gas_mapping/variance_labels'),
     ('ucb_pub', OccupancyGrid, '/gas_mapping/hrs/ucb'),
     ('ucb_labels_pub', MarkerArray, '/gas_mapping/hrs/ucb_labels'),
+    ('dducb_pub', OccupancyGrid, '/gas_mapping/hrs/dducb'),
+    ('dducb_labels_pub', MarkerArray, '/gas_mapping/hrs/dducb_labels'),
     ('measurement_grid_pub', OccupancyGrid,
      '/gas_mapping/measurements/grid'),
     ('measurement_labels_pub', MarkerArray,
@@ -51,6 +54,7 @@ PUBLISHER_SPECS = (
     ('hrs_candidates_pub', Marker, '/gas_mapping/hrs/candidates'),
     ('hrs_status_pub', Marker, '/gas_mapping/hrs/status'),
     ('hrs_estimated_source_pub', Marker, '/gas_mapping/hrs/estimated_source'),
+    ('hrs_evaluation_reference_pub', MarkerArray, '/gas_mapping/hrs/evaluation_reference'),
     ('phase_pub', String, '/gas_mapping/phase'),
 )
 
@@ -95,14 +99,14 @@ class ControllerVisualization:
 
     METHODS = (
         'clear_hrs_candidates', 'display_field', 'occupancy_grid',
-        'publish_maps', 'publish_ucb',
+        'publish_maps', 'publish_ucb', 'publish_dducb',
         'logarithmic_display',
         'publish_measurements',
         'publish_lrs_active_route', 'publish_lrs_reward',
         'publish_lrs_priority_candidates', 'publish_lrs_priority_route',
         'publish_history', 'publish_empty_hrs_route', 'value_color',
         'publish_lrs_status', 'publish_candidates', 'publish_hrs_route',
-        'publish_hrs_status', 'publish_estimated_source',
+        'publish_hrs_status', 'publish_estimated_source', 'publish_evaluation_reference',
     )
 
     def __init__(self, controller):
@@ -191,6 +195,40 @@ class ControllerVisualization:
             self.controller.occupancy_grid(template, values, free))
         self.controller.ucb_labels_pub.publish(self.field_value_labels(
             ucb, 'gas_mapping_hrs_ucb_values', (1.0, 1.0, 1.0)))
+
+    def publish_dducb(self, candidates):
+        """Display the DD-UCB score (UCB minus the distance penalty) that
+        actually picked the current HRS target, not just raw UCB. Cells that
+        are not currently candidates (already sampled, unreachable, outside
+        the eligible set) show as unknown; the grid color is min-max
+        normalized across today's candidates so the winning cell always
+        reads as the brightest one, while the text labels keep the raw
+        score for debugging."""
+        if self.controller.gmrf is None:
+            return
+        cell_count = len(self.controller.gmrf.var_cells)
+        has_score = np.zeros(cell_count, dtype=bool)
+        scores = np.zeros(cell_count, dtype=float)
+        for candidate in candidates:
+            has_score[candidate.variable] = True
+            scores[candidate.variable] = candidate.score
+        if np.any(has_score):
+            lo = float(np.min(scores[has_score]))
+            hi = float(np.max(scores[has_score]))
+            span = hi - lo
+            normalized = np.where(
+                has_score, (scores - lo) / span if span > 1.0e-9 else 0.5, 0.0)
+        else:
+            normalized = scores
+        template, values, free = self.controller.display_field(normalized)
+        _, candidate_field, candidate_free = self.controller.display_field(
+            has_score.astype(float))
+        mask = free & candidate_free & (candidate_field > 0.5)
+        self.controller.dducb_pub.publish(
+            self.controller.occupancy_grid(template, values, mask))
+        label_values = np.where(has_score, scores, np.nan)
+        self.controller.dducb_labels_pub.publish(self.field_value_labels(
+            label_values, 'gas_mapping_hrs_dducb_values', (1.0, 0.65, 0.0)))
 
     def logarithmic_display(self, values):
         return transform_logarithmic_display(
@@ -420,6 +458,11 @@ class ControllerVisualization:
             marker.pose.position.z = 0.2
             marker.pose.orientation.w = 1.0
         self.controller.hrs_estimated_source_pub.publish(marker)
+
+    def publish_evaluation_reference(self, row=None):
+        """Show all corrected reference cells and the logged adjusted error."""
+        self.controller.hrs_evaluation_reference_pub.publish(evaluation_markers(
+            row, self.controller.get_clock().now().to_msg()))
 
     def publish_hrs_route(self, targets):
         path = Path()

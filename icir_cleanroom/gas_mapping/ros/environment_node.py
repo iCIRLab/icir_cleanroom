@@ -12,7 +12,7 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, String
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker
 
@@ -21,6 +21,7 @@ from ..environment import (
     RANDOM_SOURCE_PARAMETER_NAMES, SOURCE_CONFIGURATION_PARAMETER_NAMES,
     SOURCE_PARAMETER_NAMES, generate_random_source_state,
     generate_recurrent_hotspot_source_state, load_source_state,
+    new_generation_stats,
     save_source_state, validated_hotspot_source_config,
     validated_random_source_config, validated_source_state)
 from ..mapping.domains import (
@@ -122,6 +123,7 @@ class GasEnvironmentNode(Node):
             None if self.source_random_seed < 0
             else self.source_random_seed)
         self.source_detection_points = None
+        self.source_generation_stats = new_generation_stats()
         self.source_ready = self.source_mode == 'manual'
         if self.source_mode == 'manual':
             self.restore_source_state()
@@ -145,6 +147,9 @@ class GasEnvironmentNode(Node):
             transient_qos())
         self.source_pub = self.create_publisher(
             Marker, '/gas_mapping/source', transient_qos())
+        # Logging-only ground truth; the controller never reads it for policy.
+        self.source_truth_pub = self.create_publisher(
+            String, '/gas_mapping/source_truth', transient_qos())
         self.sensor_pub = self.create_publisher(
             Float64, '/gas_mapping/sensor_concentration', 20)
         self.create_subscription(PoseStamped, '/gas_sensor/sensor_pose', self.pose_callback, 20)
@@ -238,11 +243,16 @@ class GasEnvironmentNode(Node):
             save_source_state(self.source_state_file, proposed)
         for name in SOURCE_PARAMETER_NAMES:
             setattr(self, name, proposed[name])
+        stats = self.source_generation_stats
         self.get_logger().info(
             'Initial random gas source generated: '
             f'position=({self.source_x:.3f},{self.source_y:.3f}), '
             f'strength={self.source_strength:.3f}, '
-            f'sigma={self.source_sigma:.3f}')
+            f'sigma={self.source_sigma:.3f}, '
+            f'attempts={stats["source_generation_attempts"]}, '
+            f'rejected_detection={stats["source_rejected_detection"]}, '
+            f'rejected_separation={stats["source_rejected_separation"]}, '
+            f'rejected_out_of_bounds={stats["source_rejected_out_of_bounds"]}')
 
     def generate_random_source(self, previous_position):
         if self.source_mode == 'recurrent_hotspots_after_peak':
@@ -259,7 +269,8 @@ class GasEnvironmentNode(Node):
                 self.source_hotspot_centers,
                 self.source_hotspot_weights,
                 self.source_hotspot_jitter_sigma,
-                self.source_detection_points)
+                self.source_detection_points,
+                stats=self.source_generation_stats)
         return generate_random_source_state(
             self.source_rng,
             self.map_min_x, self.map_max_x,
@@ -273,6 +284,7 @@ class GasEnvironmentNode(Node):
             self.source_random_detection_threshold,
             self.source_detection_points,
             previous_position=previous_position,
+            stats=self.source_generation_stats,
         )
 
     def advance_source_callback(self, request, response):
@@ -469,6 +481,26 @@ class GasEnvironmentNode(Node):
         marker.scale.x = marker.scale.y = marker.scale.z = 0.4
         marker.color.r, marker.color.g, marker.color.b, marker.color.a = 1.0, 0.1, 0.0, 1.0
         self.source_pub.publish(marker)
+        self.publish_source_truth()
+
+    def publish_source_truth(self):
+        """Publish sigma, strength, and discarded-proposal counts for the record."""
+        truth = dict(
+            source_enabled=bool(self.source_enabled),
+            source_x=float(self.source_x), source_y=float(self.source_y),
+            source_strength=float(self.source_strength),
+            source_sigma=float(self.source_sigma),
+            source_mode=str(self.source_mode),
+            source_random_seed=int(self.source_random_seed),
+            source_detection_threshold=float(
+                self.source_random_detection_threshold),
+            source_detection_point_count=(
+                0 if self.source_detection_points is None
+                else len(self.source_detection_points)),
+            **self.source_generation_stats)
+        self.source_truth_pub.publish(String(
+            data=json.dumps(truth, ensure_ascii=False, allow_nan=False,
+                            sort_keys=True)))
 
 
 def main(args=None):

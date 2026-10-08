@@ -169,12 +169,12 @@ def test_all_methods_isolated_three_measurement_smoke(method, map_message_factor
         s.updated(target.variable, value, g)
         log.initial_complete(iteration*3.+2., iteration*3.+2.)
         assert s.stage == 'SEARCH'
-    row = log.finish(9., 9., outcome='failed', reason='offline_test_limit', robot_xy=xy, source_end=None)
-    assert row['method_id'] == method and row['schema_version'] == 2
+    row = log.finish(9., 9., reason='offline_test_limit', robot_xy=xy, source_end=None)
+    assert row['method_id'] == method and row['schema_version'] == 6
     assert row['attempt_count'] == row['measurement_count'] == 3
     assert row['search_iterations'] == s.search_iterations == 2
     assert row['initial_seconds'] + row['search_seconds'] == row['total_seconds']
-    assert row['final_position_error'] is None
+    assert row['source_position_error'] is None
     saved = next(csv.DictReader((log.directory/'runs.csv').open()))
     assert saved['measurement_count'] == '3'
     assert len(set(path)) == 3
@@ -196,6 +196,7 @@ def test_ros_planning_dispatch_uses_method_and_initial_revisit(method, map_messa
            sampling_distance=o, latest_pose=NS(pose=NS(position=NS(x=.25, y=.25))),
            planning_executor=NS(active_task=None), hrs_candidate_variables=set(),
            hrs_cycles=0, publish_phase=lambda phase: None,
+           publish_dducb=lambda *args: None,
            publish_candidates=lambda *args: None, publish_hrs_route=lambda *args: None,
            get_clock=lambda: NS(now=lambda: NS(nanoseconds=1)),
            get_logger=lambda: NS(info=lambda msg: None))

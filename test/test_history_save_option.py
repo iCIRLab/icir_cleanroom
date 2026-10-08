@@ -31,7 +31,7 @@ def test_disabled_saves_preserve_file_and_csv_still_works(tmp_path, map_message_
     log = HrsRunLog(tmp_path/'results', 'test_clock')
     log.start(0., 0., event_id='test', lrs_lap=1, source=None,
               parameters={'save_history': False})
-    log.finish(1., 1., outcome='failed', reason='test', robot_xy=None, source_end=None)
+    log.finish(1., 1., reason='test', robot_xy=None, source_end=None)
     assert (log.directory/'runs.csv').is_file()
     assert (log.directory/'events.csv').is_file()
 
@@ -52,4 +52,29 @@ def test_save_history_boolean_config():
     assert ControllerConfig.from_mapping(values).history.save_history is False
     values['save_history'] = 'false'
     with pytest.raises(ValueError, match='save_history'):
+        ControllerConfig.from_mapping(values)
+
+
+def test_disabled_history_loading_does_not_read_existing_file(tmp_path, map_message_factory, monkeypatch):
+    path = tmp_path / 'history.json'
+    path.write_text('This must never be read or parsed.')
+    store = GasHistoryStore(path, map_message_factory(), .2)
+    store.history_count = 7
+    calls = []
+    monkeypatch.setattr(store, 'load', lambda: calls.append('load'))
+    c = NS(history=store, load_history=False,
+           get_logger=lambda: NS(info=lambda message: None))
+    GasMappingControllerNode.restore_history(c)
+    assert calls == []
+    assert store.history_count == 0 and store.records == {}
+    assert path.read_text() == 'This must never be read or parsed.'
+
+
+def test_load_history_boolean_config():
+    values = ControllerConfig.defaults().flat_values()
+    assert values['load_history'] is True
+    values['load_history'] = False
+    assert ControllerConfig.from_mapping(values).history.load_history is False
+    values['load_history'] = 'false'
+    with pytest.raises(ValueError, match='load_history'):
         ControllerConfig.from_mapping(values)

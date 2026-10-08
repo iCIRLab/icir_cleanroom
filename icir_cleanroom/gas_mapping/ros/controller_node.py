@@ -2,6 +2,7 @@
 
 import copy
 import math
+import time
 
 import numpy as np
 import rclpy
@@ -33,7 +34,7 @@ from ..models import (
 from ..phase_machine import PhaseMachine
 from .nav2_client import Nav2Client
 from .hrs_workflow import HrsWorkflow
-from .hrs_run_logging import record_hrs, source_position
+from .hrs_run_logging import record_hrs, record_lrs, source_position, source_truth
 from .lrs_workflow import LrsWorkflow
 from .navigation_workflow import NavigationWorkflow
 from .planning_workflow import PlanningWorkflow
@@ -103,12 +104,16 @@ class GasMappingControllerNode(Node):
         for name, value in self.config.flat_values().items():
             setattr(self, name, value)
         self.hrs_log_source = None
+        self.hrs_log_source_truth = None
         self.hrs_run_log = HrsRunLog(
             self.hrs_results_directory,
             'ros_simulation' if self.get_parameter('use_sim_time').value else 'ros_wall_clock')
         self.create_subscription(
             Marker, '/gas_mapping/source',
             lambda msg: source_position(self, msg), transient_qos())
+        self.create_subscription(
+            String, '/gas_mapping/source_truth',
+            lambda msg: source_truth(self, msg), transient_qos())
         self.navigation_state = NavigationState()
         self.lrs_state = LrsRuntimeState()
         self.event_state = MappingEventState()
@@ -218,7 +223,8 @@ class GasMappingControllerNode(Node):
             'LRS route, GMRF domain, robot pose와 Nav2를 기다리는 중...')
 
     def destroy_node(self):
-        record_hrs(self, 'finish', outcome='interrupted', reason='node_shutdown')
+        record_lrs(self, 'finish', outcome='interrupted', reason='node_shutdown')
+        record_hrs(self, 'finish', reason='node_shutdown')
         self.planning_executor.shutdown()
         self.measurement_manager.cancel()
         self.navigation_manager.cancel_active_goal()
@@ -249,6 +255,19 @@ class GasMappingControllerNode(Node):
         self.history = GasHistoryStore(
             self.history_file, msg, float(self.hazard_threshold),
             recent_alpha=float(self.history_recent_alpha))
+        self.restore_history()
+        self.update_gmrf('initialization')
+        self.publish_history()
+        self.publish_hrs_status()
+        self.get_logger().info(
+            f'GMRF 생성: {len(self.gmrf.solution)} field variables')
+
+    def restore_history(self):
+        if not self.load_history:
+            self.history.reset()
+            self.get_logger().info(
+                'History loading disabled; starting with empty history.')
+            return
         try:
             loaded = self.history.load()
             if loaded:
@@ -261,11 +280,6 @@ class GasMappingControllerNode(Node):
                 f'가스 이력 파일을 사용할 수 없어 빈 이력으로 시작합니다: '
                 f'{error}')
             self.history.reset()
-        self.update_gmrf('initialization')
-        self.publish_history()
-        self.publish_hrs_status()
-        self.get_logger().info(
-            f'GMRF 생성: {len(self.gmrf.solution)} field variables')
 
     def sampling_map_callback(self, msg):
         self.sampling_map_msg = copy.deepcopy(msg)
@@ -352,6 +366,10 @@ class GasMappingControllerNode(Node):
     def pose_callback(self, msg):
         """Record map-frame base_link position for planning and measurements."""
         self.latest_pose = copy.deepcopy(msg)
+        recorder = getattr(self, 'hrs_run_log', None)
+        if recorder is not None:
+            recorder.observe_time(self.get_clock().now().nanoseconds * 1.e-9, time.monotonic())
+            recorder.position((msg.pose.position.x, msg.pose.position.y))
 
     def value_callback(self, msg):
         self.measurement_manager.add_sample(msg.data)

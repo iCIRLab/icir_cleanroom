@@ -271,6 +271,7 @@ def test_hrs_planning_advances_source_when_candidates_are_exhausted():
             distances_from=lambda first, targets: tuple(math.dist(first, point) for point in targets),
             distance=lambda first, second: 0.0),
         build_candidates=lambda: (),
+        publish_dducb=lambda *args: None,
         publish_phase=lambda phase: events.append('phase'),
         publish_candidates=lambda candidates, representatives, selected:
             events.append('candidates'),
@@ -323,6 +324,7 @@ def test_hrs_planning_routes_only_one_highest_dd_ucb_cell():
         retry=2,
         hrs_cycle_started_ns=None,
         build_candidates=lambda: candidates,
+        publish_dducb=lambda *args: None,
         publish_phase=lambda phase: events.append(('phase', phase)),
         publish_candidates=lambda selected, representatives, target:
             events.append('candidates'),

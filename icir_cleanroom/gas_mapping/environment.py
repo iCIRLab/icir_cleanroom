@@ -170,16 +170,29 @@ def random_source_is_lrs_detectable(
     return False
 
 
+def new_generation_stats():
+    """Counters for proposals discarded before a source is accepted."""
+    return {
+        'source_generation_attempts': 0,
+        'source_rejected_detection': 0,
+        'source_rejected_separation': 0,
+        'source_rejected_out_of_bounds': 0,
+        'source_generation_exhausted': False,
+    }
+
+
 def generate_random_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
         sigma_min, sigma_max, strength_min, strength_max,
         min_separation, detection_threshold,
         sampling_points, previous_position=None,
-        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
+        max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, stats=None):
     x_centers = inclusive_axis(min_x, max_x, gmrf_resolution)
     y_centers = inclusive_axis(min_y, max_y, gmrf_resolution)
     min_separation_sq = min_separation ** 2
+    counters = new_generation_stats()
     for _ in range(max_attempts):
+        counters['source_generation_attempts'] += 1
         proposed = {
             'source_enabled': True,
             'source_x': float(rng.choice(x_centers)),
@@ -191,10 +204,17 @@ def generate_random_source_state(
             dx = proposed['source_x'] - previous_position[0]
             dy = proposed['source_y'] - previous_position[1]
             if dx * dx + dy * dy < min_separation_sq:
+                counters['source_rejected_separation'] += 1
                 continue
         if random_source_is_lrs_detectable(
                 proposed, detection_threshold, sampling_points):
+            if stats is not None:
+                stats.update(counters)
             return proposed
+        counters['source_rejected_detection'] += 1
+    counters['source_generation_exhausted'] = True
+    if stats is not None:
+        stats.update(counters)
     raise ValueError(
         f'could not generate a detectable random gas source in '
         f'{max_attempts} attempts')
@@ -214,11 +234,13 @@ def generate_recurrent_hotspot_source_state(
         rng, min_x, max_x, min_y, max_y, gmrf_resolution,
         sigma_min, sigma_max, strength_min, strength_max, detection_threshold,
         hotspot_centers, hotspot_weights, hotspot_jitter_sigma,
-        sampling_points, max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS):
+        sampling_points, max_attempts=RANDOM_SOURCE_MAX_ATTEMPTS, stats=None):
     hotspots = [
         (hotspot_centers[index], hotspot_centers[index + 1])
         for index in range(0, len(hotspot_centers), 2)]
+    counters = new_generation_stats()
     for _ in range(max_attempts):
+        counters['source_generation_attempts'] += 1
         hotspot_index = rng.choices(
             range(len(hotspots)), weights=hotspot_weights, k=1)[0]
         center_x, center_y = hotspots[hotspot_index]
@@ -236,10 +258,17 @@ def generate_recurrent_hotspot_source_state(
         if not (
                 min_x <= proposed['source_x'] <= max_x
                 and min_y <= proposed['source_y'] <= max_y):
+            counters['source_rejected_out_of_bounds'] += 1
             continue
         if random_source_is_lrs_detectable(
                 proposed, detection_threshold, sampling_points):
+            if stats is not None:
+                stats.update(counters)
             return proposed
+        counters['source_rejected_detection'] += 1
+    counters['source_generation_exhausted'] = True
+    if stats is not None:
+        stats.update(counters)
     raise ValueError(
         f'could not generate a detectable recurrent-hotspot gas source in '
         f'{max_attempts} attempts')

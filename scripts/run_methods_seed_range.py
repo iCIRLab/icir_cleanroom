@@ -36,8 +36,9 @@ def run_seed_round(root, package, environment, seed, source_mode, domain, gui,
     if manifest_path.exists():
         import json
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-        if manifest['seed'] != seed or manifest['source_mode'] != source_mode:
-            raise ValueError(f'{root} already holds a different seed/source_mode')
+        if (manifest.get('environment') != environment or manifest['seed'] != seed
+                or manifest['source_mode'] != source_mode):
+            raise ValueError(f'{root} already holds a different environment/seed/source_mode')
     else:
         manifest = prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history)
     rows = []
@@ -68,7 +69,7 @@ def run_seed_round(root, package, environment, seed, source_mode, domain, gui,
         rows[index], stop = run_one_paused(method, folder, run['command'], env, timeout,
                                            gui and pause and not last_of_batch)
         save_summary(root, rows)
-        print(f"{method}: {rows[index]['runner_status']} / {rows[index].get('outcome', 'no HRS result')} / "
+        print(f"{method}: {rows[index]['runner_status']} / "
               f"{rows[index].get('termination_reason', '')}", flush=True)
         if rows[index]['runner_status'] != 'completed':
             exit_code = 1
@@ -82,7 +83,7 @@ def run_seed_round(root, package, environment, seed, source_mode, domain, gui,
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--environment', default='aws_small_warehouse')
+    parser.add_argument('--environment', default='cleanroom_amc')
     parser.add_argument('--start-seed', type=int, required=True,
                          help='First seed to run; M1..M7 inside it share that seed\'s source')
     parser.add_argument('--count', type=int, default=1,

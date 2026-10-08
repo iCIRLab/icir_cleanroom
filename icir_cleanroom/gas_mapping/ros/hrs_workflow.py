@@ -14,6 +14,7 @@ class HrsWorkflow:
 
     def __init__(self, controller):
         self.controller = controller
+        self._finishing = False
 
     def available_variables(self):
         return self.controller.hrs_manager.available_variables(
@@ -63,6 +64,7 @@ class HrsWorkflow:
         added = current - previous
         removed = previous - current
         self.controller.publish_candidates(scored_candidates, (), selected)
+        self.controller.publish_dducb(scored_candidates)
         self.controller.get_logger().info(
             f'HRS iteration {self.controller.hrs_cycles + 1}: '
             f'robot_pose=({current_xy[0]:.3f},{current_xy[1]:.3f}), '
@@ -117,22 +119,26 @@ class HrsWorkflow:
         self.controller.publish_estimated_source(None if x is None else (x, y))
 
     def finish_hrs_search(self, reason):
-        finished_row = record_hrs(self.controller, 'finish', outcome='failed', reason=reason)
-        self.controller.get_logger().warning(f'HRS terminated: {reason}')
-        self.publish_source_estimate(finished_row)
-        self._approach_final_estimate_then_complete(finished_row, reason)
+        if self._finishing:
+            return
+        self._finishing = True
+        estimate = record_hrs(self.controller, 'estimate')
+        self.controller.get_logger().warning(f'HRS target selection ended: {reason}')
+        self.publish_source_estimate(estimate)
+        self._approach_final_estimate_then_complete(estimate, reason)
 
     def _complete_hrs_search(self, reason):
+        if not self._finishing:
+            return
+        self._finishing = False
+        record_hrs(self.controller, 'finish', reason=reason)
         if self.controller.repeat_after_hrs:
             self.controller.start_source_transition(f'HRS terminated: {reason}')
         else:
             self.controller.complete_mapping(f'HRS terminated: {reason}')
 
     def _approach_final_estimate_then_complete(self, finished_row, reason):
-        """One last, best-effort move to the final estimated cell so the
-        robot is sitting there (for a screenshot/visual check) before
-        wrapping up; a missing estimate or a failed approach still
-        completes normally instead of blocking termination."""
+        """Keep HRS time and distance running until the final move ends."""
         x = None if finished_row is None else finished_row.get('estimated_source_cell_x')
         y = None if finished_row is None else finished_row.get('estimated_source_cell_y')
         if x is None or y is None:
@@ -145,17 +151,35 @@ class HrsWorkflow:
         goal_pose.pose.position.y = float(y)
         goal_pose.pose.orientation.w = 1.0
         self.controller.get_logger().info(
-            f'HRS 종료, 최종 추정 위치로 이동: ({float(x):.3f}, {float(y):.3f})')
+            f'최종 추정 위치로 이동 중: ({float(x):.3f}, {float(y):.3f})')
+        record_hrs(self.controller, 'final_approach_start',
+                   goal_x=float(x), goal_y=float(y))
         generation = self.controller.navigation_manager.issue_goal()
+
+        def robot_xy():
+            pose = getattr(self.controller, 'latest_pose', None)
+            if pose is None:
+                return (None, None)
+            return (pose.pose.position.x, pose.pose.position.y)
 
         def approach_failed(navigation_reason):
             self.controller.get_logger().warning(
                 f'최종 추정 위치로 이동 실패({navigation_reason}); 그대로 종료합니다')
+            end_x, end_y = robot_xy()
+            record_hrs(self.controller, 'final_approach_end', succeeded=False,
+                       reason=navigation_reason, goal_x=float(x), goal_y=float(y),
+                       robot_x=end_x, robot_y=end_y)
+            self._complete_hrs_search(f'{reason}; final approach stopped: {navigation_reason}')
+
+        def approach_succeeded():
+            end_x, end_y = robot_xy()
+            record_hrs(self.controller, 'final_approach_end', succeeded=True,
+                       reason='arrived', goal_x=float(x), goal_y=float(y),
+                       robot_x=end_x, robot_y=end_y)
             self._complete_hrs_search(reason)
 
         self.controller.nav2.send(
-            goal_pose, generation,
-            lambda: self._complete_hrs_search(reason), approach_failed)
+            goal_pose, generation, approach_succeeded, approach_failed)
 
     def finish_hrs_cycle(self):
         actual_seconds = 0.0

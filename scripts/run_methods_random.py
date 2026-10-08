@@ -182,7 +182,7 @@ def run_round(root, package, environment, seed, source_mode, domain, gui,
         rows[index], stop = run_one_paused(
             method, folder, run['command'], env, timeout, gui and not last_of_batch)
         save_summary(root, rows)
-        print(f"{method}: {rows[index]['runner_status']} / {rows[index].get('outcome', 'no HRS result')} / {rows[index].get('termination_reason', '')}", flush=True)
+        print(f"{method}: {rows[index]['runner_status']} / {rows[index].get('termination_reason', '')}", flush=True)
         if rows[index]['runner_status'] != 'completed':
             exit_code = 1
         if stop:
@@ -194,7 +194,7 @@ def run_round(root, package, environment, seed, source_mode, domain, gui,
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--environment', default='aws_small_warehouse')
+    parser.add_argument('--environment', default='cleanroom_amc')
     parser.add_argument('--output', type=Path,
                          help='New output directory (batch directory when --rounds > 1); existing directory is rejected')
     parser.add_argument('--timeout', type=float, default=1800., help='Maximum wall seconds per method, including startup and LRS (default 1800)')

@@ -18,6 +18,7 @@ topics:
       /gas_mapping/sampling_domain: nav_msgs/msg/OccupancyGrid
       /gas_mapping/navigation_goal_domain: nav_msgs/msg/OccupancyGrid
       /gas_mapping/source: visualization_msgs/msg/Marker
+      /gas_mapping/source_truth: std_msgs/msg/String
       /gas_mapping/sensor_concentration: std_msgs/msg/Float64
   lrs_planner:
     publishers:
@@ -34,6 +35,8 @@ topics:
       - /gas_mapping/variance_labels
       - /gas_mapping/hrs/ucb
       - /gas_mapping/hrs/ucb_labels
+      - /gas_mapping/hrs/dducb
+      - /gas_mapping/hrs/dducb_labels
       - /gas_mapping/measurements/grid
       - /gas_mapping/measurements/value_labels
       - /gas_mapping/measurements/poses
@@ -55,6 +58,7 @@ topics:
       - /gas_mapping/hrs/candidates
       - /gas_mapping/hrs/status
       - /gas_mapping/hrs/estimated_source
+      - /gas_mapping/hrs/evaluation_reference
       - /gas_mapping/phase
 services:
   /gas_mapping/source/advance: std_srvs/srv/Trigger

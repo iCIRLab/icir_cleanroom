@@ -5,7 +5,7 @@ from ..application.lrs import LrsManager
 from ..models import PlanningKind
 from ..planning.lrs_priority import (
     history_adjusted_cycle, solve_lrs_priority_route)
-from .hrs_run_logging import record_hrs
+from .hrs_run_logging import record_hrs, record_lrs
 from ..application.hrs_methods import HrsSession
 
 
@@ -19,6 +19,7 @@ class LrsWorkflow:
         if not self.controller.base_lrs_goals or self.controller.latest_pose is None:
             return
         self.controller.orchestrator.begin_lrs_lap()
+        record_lrs(self.controller, 'start')
         self.controller.lrs_measurement_start = len(self.controller.measurement_manager.measurements)
         self.controller.hrs_session = None
         self.controller.publish_hrs_status()
@@ -171,7 +172,9 @@ class LrsWorkflow:
             points, start_xy, distance_fn)
 
     def finish_lrs_navigation(self):
+        record_lrs(self.controller, 'finish', outcome='completed', reason='lrs_lap_complete')
         if self.controller.lap_hazard_detected:
+            self.controller.publish_phase('HRS_PLANNING')
             record_hrs(self.controller, 'start')
             manager = getattr(self.controller, 'measurement_manager', None)
             measurements = () if manager is None else manager.measurements[

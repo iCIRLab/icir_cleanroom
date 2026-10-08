@@ -65,7 +65,7 @@ def main(argv=None):
         rows.append(row)
         save_summary(root, rows + [dict(method_id=runs[i]['method'], runner_status='not_started')
                                    for i in range(index+1, len(runs))])
-        print(f"{method}: {row['runner_status']} / {row.get('outcome', 'no HRS result')} / "
+        print(f"{method}: {row['runner_status']} / "
               f"{row.get('termination_reason', '')}", flush=True)
         if row['runner_status'] != 'completed':
             exit_code = 1

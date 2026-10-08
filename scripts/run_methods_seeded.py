@@ -29,7 +29,7 @@ from run_methods_random import RANDOM_SOURCE_MODES, prepare_random, run_one_paus
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--environment', default='aws_small_warehouse')
+    parser.add_argument('--environment', default='cleanroom_amc')
     parser.add_argument('--method', required=True, choices=METHODS)
     parser.add_argument('--seed', type=int, required=True,
                          help='Shared source RNG seed; reuse the same value for every method in this round')
@@ -50,8 +50,9 @@ def main(argv=None):
     manifest_path = root/'manifest.json'
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-        if manifest['seed'] != args.seed or manifest['source_mode'] != args.source_mode:
-            parser.error(f'{root} already holds a different seed/source_mode; pass --output for a new folder')
+        if (manifest.get('environment') != args.environment or manifest['seed'] != args.seed
+                or manifest['source_mode'] != args.source_mode):
+            parser.error(f'{root} already holds a different environment/seed/source_mode; pass --output for a new folder')
     else:
         domain = args.ros_domain_id if args.ros_domain_id is not None else __import__('random').SystemRandom().randrange(20, 90)
         manifest = prepare_random(root, package, args.environment, args.seed,
@@ -65,7 +66,7 @@ def main(argv=None):
               ROS_LOG_DIR=str(folder/'ros_logs'))
     print(f'{args.method} starting (seed={args.seed}, source_mode={args.source_mode})', flush=True)
     row, _ = run_one_paused(args.method, folder, run['command'], env, args.timeout, pause=True)
-    print(f"{args.method}: {row['runner_status']} / {row.get('outcome', 'no HRS result')} / "
+    print(f"{args.method}: {row['runner_status']} / "
           f"{row.get('termination_reason', '')}", flush=True)
 
     rows = []

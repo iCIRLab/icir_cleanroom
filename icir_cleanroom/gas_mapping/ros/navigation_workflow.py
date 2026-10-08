@@ -5,7 +5,20 @@ import math
 import time
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
-from .hrs_run_logging import record_hrs
+from .hrs_run_logging import record_hrs, record_lrs
+
+
+def target_details(controller):
+    """Which HRS cell a navigation event refers to, blank when none is set."""
+    target = getattr(controller, 'active_hrs_target', None)
+    if target is None:
+        return dict(target_variable=None, target_x=None, target_y=None,
+                    target_row=None, target_col=None)
+    return dict(target_variable=getattr(target, 'variable', None),
+                target_x=getattr(target, 'x', None),
+                target_y=getattr(target, 'y', None),
+                target_row=getattr(target, 'row', None),
+                target_col=getattr(target, 'col', None))
 
 
 class NavigationWorkflow:
@@ -55,7 +68,8 @@ class NavigationWorkflow:
             f'{label} -> ({target.pose.position.x:.2f}, '
             f'{target.pose.position.y:.2f})')
         if self.controller.phase == 'HRS_NAVIGATION':
-            record_hrs(self.controller, 'navigation_attempt')
+            record_hrs(self.controller, 'navigation_attempt',
+                       **target_details(self.controller))
         goal_generation = self.controller.navigation_manager.issue_goal()
         self.controller.nav2.send(
             goal_pose, goal_generation, self.controller.navigation_succeeded,
@@ -136,6 +150,13 @@ class NavigationWorkflow:
             self.controller.publish_history()
             self.controller.record_event_measurement(variable, value)
             if self.controller.phase == 'LRS':
+                record_lrs(self.controller, 'measurement',
+                           xy=(pose.position.x, pose.position.y), value=value,
+                           sample_count=result.sample_count,
+                           cell=(int(row), int(col)),
+                           patrol_index=self.controller.current_index,
+                           hazard_threshold=float(
+                               self.controller.hazard_threshold))
                 self.controller.lrs_status_values[self.controller.current_index] = value
                 first_hazard = self.controller.lrs_manager.record_measurement(
                     value, self.controller.hazard_threshold)
@@ -194,7 +215,8 @@ class NavigationWorkflow:
     def navigation_failed(self, reason):
         if self.controller.phase == 'HRS_NAVIGATION':
             record_hrs(self.controller, 'navigation_failed', reason=reason,
-                       attempt=self.controller.retry + 1)
+                       attempt=self.controller.retry + 1,
+                       **target_details(self.controller))
         self.controller.retry += 1
         if self.controller.retry <= int(self.controller.max_retries):
             self.controller.get_logger().warning(
