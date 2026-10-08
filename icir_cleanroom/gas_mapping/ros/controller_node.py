@@ -129,8 +129,6 @@ class GasMappingControllerNode(Node):
             OccupancyGrid, '/gas_mapping/navigation_goal_domain',
             self.navigation_goal_map_callback, transient_qos())
         self.create_subscription(
-            PoseStamped, '/gas_sensor/sensor_pose', self.pose_callback, 30)
-        self.create_subscription(
             Float64, '/gas_mapping/sensor_concentration',
             self.value_callback, 30)
 
@@ -211,12 +209,13 @@ class GasMappingControllerNode(Node):
         for workflow in self.workflow_adapters:
             for name in workflow.METHODS:
                 setattr(self, name, getattr(workflow, name))
+        self.robot_pose_timer = self.create_timer(0.05, self.poll_robot_pose)
         self.start_timer = self.create_timer(1.0, self.try_start)
         self.planning_timer = self.create_timer(0.2, self.poll_planning)
         self.publish_phase('WAITING')
         self.hazard_pub.publish(Bool(data=False))
         self.get_logger().info(
-            'LRS route, GMRF domain, sensor pose와 Nav2를 기다리는 중...')
+            'LRS route, GMRF domain, robot pose와 Nav2를 기다리는 중...')
 
     def destroy_node(self):
         record_hrs(self, 'finish', outcome='interrupted', reason='node_shutdown')
@@ -343,7 +342,15 @@ class GasMappingControllerNode(Node):
             f'{len(self.navigation_goal_variables)}/'
             f'{len(self.gmrf.var_cells)} cells')
 
+    def poll_robot_pose(self):
+        pose = self.nav2.robot_pose()
+        if pose is None:
+            self.latest_pose = None
+            return
+        self.pose_callback(pose)
+
     def pose_callback(self, msg):
+        """Record map-frame base_link position for planning and measurements."""
         self.latest_pose = copy.deepcopy(msg)
 
     def value_callback(self, msg):

@@ -65,6 +65,7 @@ qos:
   retained_outputs: {reliability: reliable, durability: transient_local, depth: 1}
   sensor_pose_plugin: {depth: 10}
   sensor_pose_environment: {depth: 20}
-  sensor_pose_controller: {depth: 30}
   sensor_concentration_environment: {depth: 20}
   sensor_concentration_controller: {depth: 30}
+transforms:
+  controller_robot_pose: {target: map, source: base_link, poll_hz: 20, max_age_seconds: 0.5}
