@@ -1,0 +1,796 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="mobile_amc">
+  <link name="base_footprint" />
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size=".84 .50 .24" />
+      </geometry>
+      <material name="base_link_color">
+        <color rgba=".14 .20 .24 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".84 .50 .24" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="40" />
+      <inertia ixx="1.0253333333333332" iyy="2.5439999999999996" izz="3.185333333333333" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="base_link_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="base_link" />
+    <origin xyz="0 0 0.22" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="base_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="analyzer_cabinet">
+    <visual>
+      <geometry>
+        <box size=".66 .48 .84" />
+      </geometry>
+      <material name="analyzer_cabinet_color">
+        <color rgba=".91 .94 .95 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".66 .48 .84" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="20" />
+      <inertia ixx="1.5599999999999998" iyy="1.902" izz="1.11" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="analyzer_cabinet_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="analyzer_cabinet" />
+    <origin xyz="-.02 0 .76" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="analyzer_cabinet">
+    <material>Gazebo/White</material>
+  </gazebo>
+  <link name="bumper_front">
+    <visual>
+      <geometry>
+        <box size=".04 .60 .11" />
+      </geometry>
+      <material name="bumper_front_color">
+        <color rgba=".08 .12 .15 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".04 .60 .11" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.4" />
+      <inertia ixx="0.012403333333333334" iyy="0.0004566666666666667" izz="0.012053333333333333" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="bumper_front_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="bumper_front" />
+    <origin xyz=".43 0 .18" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="bumper_front">
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <link name="bumper_back">
+    <visual>
+      <geometry>
+        <box size=".04 .60 .11" />
+      </geometry>
+      <material name="bumper_back_color">
+        <color rgba=".08 .12 .15 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".04 .60 .11" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.4" />
+      <inertia ixx="0.012403333333333334" iyy="0.0004566666666666667" izz="0.012053333333333333" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="bumper_back_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="bumper_back" />
+    <origin xyz="-.43 0 .18" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="bumper_back">
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <link name="front_panel">
+    <visual>
+      <geometry>
+        <box size=".014 .39 .68" />
+      </geometry>
+      <material name="front_panel_color">
+        <color rgba=".12 .22 .28 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="front_panel_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="front_panel" />
+    <origin xyz=".315 0 .78" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="front_panel">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="display">
+    <visual>
+      <geometry>
+        <box size=".012 .26 .16" />
+      </geometry>
+      <material name="display_color">
+        <color rgba=".05 .62 .72 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="display_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="display" />
+    <origin xyz=".327 0 1.00" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="display">
+    <material>Gazebo/Turquoise</material>
+  </gazebo>
+  <link name="filter_cartridge">
+    <visual>
+      <geometry>
+        <box size=".02 .34 .32" />
+      </geometry>
+      <material name="filter_cartridge_color">
+        <color rgba=".45 .56 .61 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="filter_cartridge_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="filter_cartridge" />
+    <origin xyz=".325 0 .67" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="filter_cartridge">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <link name="intake_grille_0">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_0_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_0_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_0" />
+    <origin xyz=".34 0 0.54" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_0">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_1">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_1_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_1_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_1" />
+    <origin xyz=".34 0 0.5720000000000001" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_1">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_2">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_2_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_2_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_2" />
+    <origin xyz=".34 0 0.6040000000000001" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_2">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_3">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_3_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_3_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_3" />
+    <origin xyz=".34 0 0.636" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_3">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_4">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_4_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_4_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_4" />
+    <origin xyz=".34 0 0.668" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_4">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_5">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_5_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_5_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_5" />
+    <origin xyz=".34 0 0.7000000000000001" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_5">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="intake_grille_6">
+    <visual>
+      <geometry>
+        <box size=".016 .30 .012" />
+      </geometry>
+      <material name="intake_grille_6_color">
+        <color rgba=".05 .1 .13 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="intake_grille_6_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="intake_grille_6" />
+    <origin xyz=".34 0 0.732" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="intake_grille_6">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="molecular_filter_indicator">
+    <visual>
+      <geometry>
+        <box size=".018 .03 .03" />
+      </geometry>
+      <material name="molecular_filter_indicator_color">
+        <color rgba=".2 .8 .45 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="molecular_filter_indicator_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="molecular_filter_indicator" />
+    <origin xyz=".329 -.13 .90" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="molecular_filter_indicator">
+    <material>Gazebo/White</material>
+  </gazebo>
+  <link name="sampling_mast">
+    <visual>
+      <geometry>
+        <box size=".035 .035 .24" />
+      </geometry>
+      <material name="sampling_mast_color">
+        <color rgba=".52 .62 .66 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".035 .035 .24" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2" />
+      <inertia ixx="0.0009804166666666665" iyy="0.0009804166666666665" izz="4.083333333333334e-05" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="sampling_mast_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="sampling_mast" />
+    <origin xyz=".24 .16 1.24" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="sampling_mast">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <link name="sampling_inlet">
+    <visual>
+      <geometry>
+        <box size=".21 .045 .045" />
+      </geometry>
+      <material name="sampling_inlet_color">
+        <color rgba=".09 .55 .66 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".21 .045 .045" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1" />
+      <inertia ixx="3.375e-05" iyy="0.00038437499999999995" izz="0.00038437499999999995" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="sampling_inlet_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="sampling_inlet" />
+    <origin xyz=".345 .16 1.35" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="sampling_inlet">
+    <material>Gazebo/Turquoise</material>
+  </gazebo>
+  <link name="rear_exhaust">
+    <visual>
+      <geometry>
+        <box size=".015 .32 .25" />
+      </geometry>
+      <material name="rear_exhaust_color">
+        <color rgba=".1 .24 .3 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="rear_exhaust_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="rear_exhaust" />
+    <origin xyz="-.357 0 .84" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="rear_exhaust">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_0">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_0_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_0_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_0" />
+    <origin xyz="-.37 0 0.745" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_0">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_1">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_1_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_1_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_1" />
+    <origin xyz="-.37 0 0.78" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_1">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_2">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_2_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_2_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_2" />
+    <origin xyz="-.37 0 0.815" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_2">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_3">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_3_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_3_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_3" />
+    <origin xyz="-.37 0 0.85" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_3">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_4">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_4_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_4_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_4" />
+    <origin xyz="-.37 0 0.885" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_4">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="exhaust_grille_5">
+    <visual>
+      <geometry>
+        <box size=".013 .27 .012" />
+      </geometry>
+      <material name="exhaust_grille_5_color">
+        <color rgba=".52 .63 .67 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="exhaust_grille_5_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="exhaust_grille_5" />
+    <origin xyz="-.37 0 0.92" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="exhaust_grille_5">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <link name="beacon">
+    <visual>
+      <geometry>
+        <box size=".06 .06 .07" />
+      </geometry>
+      <material name="beacon_color">
+        <color rgba=".05 .8 .6 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".06 .06 .07" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1" />
+      <inertia ixx="7.083333333333334e-05" iyy="7.083333333333334e-05" izz="6e-05" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="beacon_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="beacon" />
+    <origin xyz="-.24 0 1.21" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="beacon">
+    <material>Gazebo/Green</material>
+  </gazebo>
+  <link name="sampling_inlet_low">
+    <visual>
+      <geometry>
+        <box size=".10 .04 .04" />
+      </geometry>
+      <material name="sampling_inlet_low_color">
+        <color rgba=".09 .55 .66 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".10 .04 .04" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05" />
+      <inertia ixx="1.3333333333333335e-05" iyy="4.833333333333334e-05" izz="4.833333333333334e-05" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="sampling_inlet_low_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="sampling_inlet_low" />
+    <origin xyz=".40 .16 .45" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="sampling_inlet_low">
+    <material>Gazebo/White</material>
+  </gazebo>
+  <!-- icir_cleanroom: the gas sensor plugin resolves this link in Gazebo, so it
+       must survive URDF->SDF fixed-joint lumping. Visual only: a collision here
+       would sit in front of the bumper. -->
+  <link name="gas_sensor_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.02" length="0.03" />
+      </geometry>
+      <material name="gas_sensor_color">
+        <color rgba="1 .85 .1 1" />
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.02" />
+      <inertia ixx="3.75e-06" iyy="3.75e-06" izz="4.0e-06" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="gas_sensor_link_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="gas_sensor_link" />
+    <origin xyz="0 0 .45" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="gas_sensor_link_fixed">
+    <preserveFixedJoint>true</preserveFixedJoint>
+    <disableFixedJointLumping>true</disableFixedJointLumping>
+  </gazebo>
+  <gazebo reference="gas_sensor_link">
+    <material>Gazebo/Yellow</material>
+  </gazebo>
+  <link name="gas_sensor_high_link" />
+  <joint name="gas_sensor_high_link_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="gas_sensor_high_link" />
+    <origin xyz=".45 .16 1.35" rpy="0 0 0" />
+  </joint>
+  <link name="purifier_inlet_link" />
+  <joint name="purifier_inlet_link_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="purifier_inlet_link" />
+    <origin xyz=".38 0 .64" rpy="0 0 0" />
+  </joint>
+  <link name="purifier_outlet_link" />
+  <joint name="purifier_outlet_link_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="purifier_outlet_link" />
+    <origin xyz="-.38 0 .84" rpy="0 0 0" />
+  </joint>
+  <link name="wheel_left_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="0.1" length="0.07" />
+      </geometry>
+      <material name="tire_left">
+        <color rgba=".05 .06 .07 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="0.1" length="0.07" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2" />
+      <inertia ixx="0.0058" iyy="0.01" izz="0.0058" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="wheel_left_joint" type="continuous">
+    <parent link="base_footprint" />
+    <child link="wheel_left_link" />
+    <origin xyz="0 0.28 .1" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <dynamics damping="0.05" friction="0" />
+  </joint>
+  <gazebo reference="wheel_left_link">
+    <mu1>1</mu1>
+    <mu2>1</mu2>
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <link name="wheel_right_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="0.1" length="0.07" />
+      </geometry>
+      <material name="tire_right">
+        <color rgba=".05 .06 .07 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="0.1" length="0.07" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2" />
+      <inertia ixx="0.0058" iyy="0.01" izz="0.0058" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="wheel_right_joint" type="continuous">
+    <parent link="base_footprint" />
+    <child link="wheel_right_link" />
+    <origin xyz="0 -0.28 .1" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+    <dynamics damping="0.05" friction="0" />
+  </joint>
+  <gazebo reference="wheel_right_link">
+    <mu1>1</mu1>
+    <mu2>1</mu2>
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <link name="caster_front">
+    <visual>
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2" />
+      <inertia ixx="0.000128" iyy="0.000128" izz="0.000128" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="caster_front_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="caster_front" />
+    <origin xyz="0.32 0 .04" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="caster_front">
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
+  <link name="caster_rear">
+    <visual>
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2" />
+      <inertia ixx="0.000128" iyy="0.000128" izz="0.000128" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="caster_rear_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="caster_rear" />
+    <origin xyz="-0.32 0 .04" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="caster_rear">
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
+  <link name="base_scan">
+    <visual>
+      <geometry>
+        <box size=".10 .10 .05" />
+      </geometry>
+      <material name="base_scan_color">
+        <color rgba=".08 .12 .14 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size=".10 .10 .05" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.15" />
+      <inertia ixx="0.00015625000000000003" iyy="0.00015625000000000003" izz="0.00025000000000000006" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+  <joint name="base_scan_fixed" type="fixed">
+    <parent link="base_footprint" />
+    <child link="base_scan" />
+    <origin xyz=".37 0 .36" rpy="0 0 0" />
+  </joint>
+  <gazebo reference="base_scan">
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <gazebo reference="base_scan">
+    <sensor name="amc_lidar" type="ray">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <visualize>false</visualize>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159265</min_angle>
+            <max_angle>3.14159265</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>12</max>
+          <resolution>0.01</resolution>
+        </range>
+      </ray>
+      <plugin name="amc_lidar_ros" filename="libgazebo_ros_ray_sensor.so">
+        <ros>
+          <remapping>~/out:=scan</remapping>
+        </ros>
+        <output_type>sensor_msgs/LaserScan</output_type>
+        <frame_name>base_scan</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+  <gazebo>
+    <plugin name="amc_diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <update_rate>50</update_rate>
+      <left_joint>wheel_left_joint</left_joint>
+      <right_joint>wheel_right_joint</right_joint>
+      <wheel_separation>0.56</wheel_separation>
+      <wheel_diameter>0.2</wheel_diameter>
+      <max_wheel_torque>35</max_wheel_torque>
+      <max_wheel_acceleration>0.6</max_wheel_acceleration>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>false</publish_wheel_tf>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <!-- icir_cleanroom: 1 = world ground truth. The shared launch publishes
+           an identity map->odom, so encoder odometry (0) would offset the
+           robot in map by its spawn pose. -->
+      <odometry_source>1</odometry_source>
+    </plugin>
+    <!-- icir_cleanroom: publishes /gas_sensor/sensor_pose, which
+         gas_environment_node samples for concentration. -->
+    <plugin name="gas_sensor_plugin" filename="libgas_sensor_plugin.so">
+      <sensor_link_name>gas_sensor_link</sensor_link_name>
+      <detector_radius>0.02</detector_radius>
+      <sigma>1.5</sigma>
+      <update_rate>20.0</update_rate>
+    </plugin>
+    <plugin name="amc_joint_states" filename="libgazebo_ros_joint_state_publisher.so">
+      <update_rate>30</update_rate>
+      <joint_name>wheel_left_joint</joint_name>
+      <joint_name>wheel_right_joint</joint_name>
+    </plugin>
+  </gazebo>
+</robot>

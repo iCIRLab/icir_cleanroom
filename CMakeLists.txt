@@ -33,6 +33,7 @@ install(DIRECTORY
     models
     urdf
     rviz
+    docs
     DESTINATION share/${PROJECT_NAME}
 )
 

@@ -15,7 +15,8 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 from icir_cleanroom.gas_mapping.navigation_profile import (
-    load_navigation_settings, navigation_goal_clearance, render_robot_sdf)
+    load_navigation_settings, navigation_goal_clearance, render_robot_sdf,
+    validated_robot)
 
 
 def remove_temporary_file(path):
@@ -57,10 +58,18 @@ def launch_setup(context):
         if not os.path.isfile(path):
             raise RuntimeError(f'Environment {description} not found: {path}')
 
-    robot_urdf = os.path.join(
-        package_dir, 'urdf', 'tb3_with_gas_sensor.urdf')
-    robot_sdf = os.path.join(
-        package_dir, 'urdf', 'tb3_with_gas_sensor.sdf')
+    try:
+        robot = validated_robot(environment.get('robot'))
+    except ValueError as error:
+        raise RuntimeError(
+            f'Invalid environment robot block in {profile_path}: {error}') \
+            from error
+    robot_urdf = os.path.join(package_dir, robot['description'])
+    robot_sdf = os.path.join(package_dir, robot['model'])
+    for description, path in (
+            ('robot description', robot_urdf), ('robot model', robot_sdf)):
+        if not os.path.isfile(path):
+            raise RuntimeError(f'Environment {description} not found: {path}')
     rviz = os.path.join(package_dir, 'rviz', 'cleanroom_empty.rviz')
     base_nav2_params = run_config.get('base_nav2_params') or os.path.join(
         package_dir, 'config', 'nav2_params.yaml')
@@ -87,11 +96,12 @@ def launch_setup(context):
     with open(robot_sdf, 'r', encoding='utf-8') as stream:
         robot_xml = stream.read()
     try:
-        robot_xml = render_robot_sdf(robot_xml, robot_motion)
+        robot_xml = render_robot_sdf(
+            robot_xml, robot_motion, robot['lidar_sensor_name'])
     except (TypeError, ValueError) as error:
         raise RuntimeError(f'Invalid robot motion profile: {error}') from error
     with tempfile.NamedTemporaryFile(
-            mode='w', prefix='icir_mapping_robot_', suffix='.sdf',
+            mode='w', prefix=f'icir_mapping_{robot["entity"]}_', suffix='.sdf',
             delete=False, encoding='utf-8') as stream:
         stream.write(robot_xml)
         temporary_sdf = stream.name
@@ -158,7 +168,7 @@ def launch_setup(context):
             package='gazebo_ros', executable='spawn_entity.py',
             arguments=[
                 '-file', temporary_sdf,
-                '-entity', 'turtlebot3_with_gas_sensor',
+                '-entity', robot['entity'],
                 '-x', str(spawn['x']), '-y', str(spawn['y']),
                 '-z', str(spawn['z']), '-Y', str(spawn['yaw'])],
             output='screen'),
@@ -208,7 +218,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('run_config', default_value='',
                               description='Optional batch snapshot YAML (profile and controller)'),
-        DeclareLaunchArgument('environment', default_value='empty_50m'),
+        DeclareLaunchArgument('environment', default_value='cleanroom_amc'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
         DeclareLaunchArgument('save_history', default_value='true',

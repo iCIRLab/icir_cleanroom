@@ -1,0 +1,56 @@
+# 20 x 14 m cleanroom with the mobile AMC robot.
+# Geometry and layout come from cleanroom_gas_sim; see docs/third_party/.
+environment:
+  world: worlds/cleanroom_amc/cleanroom.world
+  map: maps/cleanroom_amc/cleanroom.yaml
+  navigation_profile: config/navigation/cleanroom_amc_safe.yaml
+  # Inside the airlock, west of the 1.6 m doorway at x = -6.5.
+  robot_spawn: {x: -8.0, y: -5.0, z: 0.01, yaw: 0.0}
+  robot:
+    description: urdf/mobile_amc.urdf
+    model: urdf/mobile_amc.sdf
+    entity: mobile_amc
+    lidar_sensor_name: amc_lidar
+
+gas_environment:
+  source_mode: manual
+  source_enabled: true
+  source_x: -3.0
+  source_y: 1.7
+  source_strength: 1.0
+  source_sigma: 2.0
+  source_random_seed: -1
+  source_random_sigma_min: 1.5
+  source_random_sigma_max: 3.0
+  source_random_strength_min: 0.5
+  source_random_strength_max: 1.0
+  source_random_min_separation: 0.0
+  source_random_detection_threshold: 0.2
+  # Process-tool gas release points from the cleanroom layout.
+  source_hotspot_centers: [-3.0, 1.7, 2.0, 1.7, 6.3, 1.6, -3.0, -1.7, 2.0, -1.7, 6.3, -1.6]
+  source_hotspot_weights: [0.2, 0.2, 0.15, 0.2, 0.15, 0.1]
+  source_hotspot_jitter_sigma: 0.8
+  persist_source_state: false
+  source_state_file: ~/.ros/icir_cleanroom/cleanroom_amc_gas_source_state.json
+  # Indoor gas field, not the map extent: the map spans x[-10.5,10.5] y[-7.5,7.5].
+  map_min_x: -10.0
+  map_max_x: 10.0
+  map_min_y: -7.0
+  map_max_y: 7.0
+  ground_truth_resolution: 0.1
+  gmrf_resolution: 0.5
+  # The AMC footprint is 0.96 x 0.68 m; 0.5 m keeps a 0.70 m band through the
+  # 1.6 m airlock doorway while holding the body off walls and tool bays.
+  sampling_clearance: 0.5
+  robot_start_x: -8.0
+  robot_start_y: -5.0
+  log_concentration_min: -4.0
+
+lrs:
+  # 164.5 m2 of sampling domain at 0.5 m clearance, matching the ~14.5 m2 per
+  # cluster density the AWS warehouse profile uses.
+  lrs_cluster_count: 12
+  lrs_cluster_random_seed: 0
+  robot_start_x: -8.0
+  robot_start_y: -5.0
+  tsp_time_limit: 60.0

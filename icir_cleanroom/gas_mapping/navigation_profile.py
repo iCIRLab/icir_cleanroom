@@ -13,6 +13,16 @@ ROBOT_MOTION_KEYS = (
     'lidar_update_rate',
 )
 
+# The TurtleBot3 model both existing environments spawn. An environment profile
+# without a `robot` block keeps using it unchanged.
+DEFAULT_ROBOT = {
+    'description': 'urdf/tb3_with_gas_sensor.urdf',
+    'model': 'urdf/tb3_with_gas_sensor.sdf',
+    'entity': 'turtlebot3_with_gas_sensor',
+    'lidar_sensor_name': 'hls_lfcd_lds',
+}
+ROBOT_KEYS = tuple(DEFAULT_ROBOT)
+
 
 def recursive_merge(base, overrides):
     """Return a deep merge without mutating either input mapping."""
@@ -103,9 +113,31 @@ def replace_unique(xml, pattern, value, description):
         xml, count=1, flags=re.DOTALL)
 
 
-def render_robot_sdf(robot_xml, robot_motion):
+def validated_robot(value):
+    """Resolve an environment `robot` block against the TurtleBot3 default."""
+    if value is None:
+        return dict(DEFAULT_ROBOT)
+    if not isinstance(value, dict):
+        raise ValueError('environment robot must be a mapping')
+    unknown = sorted(set(value) - set(ROBOT_KEYS))
+    if unknown:
+        raise ValueError(
+            'environment robot has unknown keys: ' + ', '.join(unknown))
+    resolved = dict(DEFAULT_ROBOT)
+    for key, entry in value.items():
+        if not isinstance(entry, str) or not entry.strip():
+            raise ValueError(f'environment robot.{key} must be a non-empty string')
+        resolved[key] = entry.strip()
+    return resolved
+
+
+def render_robot_sdf(robot_xml, robot_motion, lidar_sensor_name=None):
     """Apply validated profile motion values to the temporary robot SDF."""
     motion = validated_robot_motion(robot_motion)
+    sensor = lidar_sensor_name or DEFAULT_ROBOT['lidar_sensor_name']
+    if not isinstance(sensor, str) or not sensor.strip():
+        raise ValueError('lidar_sensor_name must be a non-empty string')
+    sensor = sensor.strip()
     output = replace_unique(
         robot_xml,
         r'(<max_wheel_acceleration>)\s*[^<]+\s*'
@@ -114,12 +146,13 @@ def render_robot_sdf(robot_xml, robot_motion):
         'max_wheel_acceleration element')
     return replace_unique(
         output,
-        r'(<sensor\s+name=["\']hls_lfcd_lds["\'][^>]*>.*?'
+        r'(<sensor\s+name=["\']' + re.escape(sensor) + r'["\'][^>]*>.*?'
         r'<update_rate>)\s*[^<]+\s*(</update_rate>)',
         str(motion['lidar_update_rate']),
-        'hls_lfcd_lds update_rate element')
+        f'{sensor} update_rate element')
 
 
 __all__ = [
-    'load_navigation_settings', 'navigation_goal_clearance',
-    'recursive_merge', 'render_robot_sdf', 'validated_robot_motion']
+    'DEFAULT_ROBOT', 'load_navigation_settings', 'navigation_goal_clearance',
+    'recursive_merge', 'render_robot_sdf', 'validated_robot',
+    'validated_robot_motion']

@@ -1,0 +1,359 @@
+{
+  "room_size": [
+    20,
+    14,
+    3.2
+  ],
+  "spawn": [
+    -8,
+    -5,
+    0.01
+  ],
+  "obstacles": [
+    {
+      "name": "wall_north",
+      "center": [
+        0,
+        7.1,
+        1.65
+      ],
+      "size": [
+        20.4,
+        0.2,
+        3.3
+      ]
+    },
+    {
+      "name": "wall_south",
+      "center": [
+        0,
+        -7.1,
+        1.65
+      ],
+      "size": [
+        20.4,
+        0.2,
+        3.3
+      ]
+    },
+    {
+      "name": "wall_east",
+      "center": [
+        10.1,
+        0,
+        1.65
+      ],
+      "size": [
+        0.2,
+        14,
+        3.3
+      ]
+    },
+    {
+      "name": "wall_west",
+      "center": [
+        -10.1,
+        0,
+        1.65
+      ],
+      "size": [
+        0.2,
+        14,
+        3.3
+      ]
+    },
+    {
+      "name": "airlock_north",
+      "center": [
+        -8.25,
+        -3,
+        1.65
+      ],
+      "size": [
+        3.5,
+        0.15,
+        3.3
+      ]
+    },
+    {
+      "name": "airlock_door_south",
+      "center": [
+        -6.5,
+        -6.4,
+        1.65
+      ],
+      "size": [
+        0.15,
+        1.2,
+        3.3
+      ]
+    },
+    {
+      "name": "airlock_door_north",
+      "center": [
+        -6.5,
+        -3.6,
+        1.65
+      ],
+      "size": [
+        0.15,
+        1.2,
+        3.3
+      ]
+    },
+    {
+      "name": "etch_A",
+      "center": [
+        -3,
+        3,
+        1.15
+      ],
+      "size": [
+        2.4,
+        2,
+        2.3
+      ]
+    },
+    {
+      "name": "CVD_B",
+      "center": [
+        2,
+        3,
+        1.2
+      ],
+      "size": [
+        2.4,
+        2,
+        2.4
+      ]
+    },
+    {
+      "name": "lithography_C",
+      "center": [
+        6.3,
+        3,
+        1.15
+      ],
+      "size": [
+        2.6,
+        2.2,
+        2.3
+      ]
+    },
+    {
+      "name": "wet_bench_D",
+      "center": [
+        -3,
+        -3,
+        0.95
+      ],
+      "size": [
+        2.4,
+        2,
+        1.9
+      ]
+    },
+    {
+      "name": "metrology_E",
+      "center": [
+        2,
+        -3,
+        0.95
+      ],
+      "size": [
+        2.4,
+        2,
+        1.9
+      ]
+    },
+    {
+      "name": "process_F",
+      "center": [
+        6.3,
+        -3,
+        1.1
+      ],
+      "size": [
+        2.6,
+        2.2,
+        2.2
+      ]
+    },
+    {
+      "name": "gas_cabinet_1",
+      "center": [
+        -5,
+        6.35,
+        1.1
+      ],
+      "size": [
+        1.2,
+        0.9,
+        2.2
+      ]
+    },
+    {
+      "name": "gas_cabinet_2",
+      "center": [
+        -3.2,
+        6.35,
+        1.1
+      ],
+      "size": [
+        1.2,
+        0.9,
+        2.2
+      ]
+    },
+    {
+      "name": "gas_cabinet_3",
+      "center": [
+        -1.4,
+        6.35,
+        1.1
+      ],
+      "size": [
+        1.2,
+        0.9,
+        2.2
+      ]
+    },
+    {
+      "name": "clean_bench",
+      "center": [
+        -8.8,
+        2,
+        0.8
+      ],
+      "size": [
+        1.4,
+        3,
+        1.6
+      ]
+    },
+    {
+      "name": "pass_box",
+      "center": [
+        -8.8,
+        5.5,
+        0.75
+      ],
+      "size": [
+        1.4,
+        1.4,
+        1.5
+      ]
+    },
+    {
+      "name": "utility_rack",
+      "center": [
+        9.25,
+        5.5,
+        1
+      ],
+      "size": [
+        1,
+        2,
+        2
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "name": "S01_etch",
+      "position": [
+        -3,
+        1.7,
+        0.7
+      ]
+    },
+    {
+      "name": "S02_cvd",
+      "position": [
+        2,
+        1.7,
+        1.2
+      ]
+    },
+    {
+      "name": "S03_lithography",
+      "position": [
+        6.3,
+        1.6,
+        0.5
+      ]
+    },
+    {
+      "name": "S04_wet_bench",
+      "position": [
+        -3,
+        -1.7,
+        0.6
+      ]
+    },
+    {
+      "name": "S05_metrology",
+      "position": [
+        2,
+        -1.7,
+        0.8
+      ]
+    },
+    {
+      "name": "S06_process",
+      "position": [
+        6.3,
+        -1.6,
+        1.2
+      ]
+    },
+    {
+      "name": "S07_cabinet",
+      "position": [
+        -5,
+        5.6,
+        1.0
+      ]
+    },
+    {
+      "name": "S08_cabinet",
+      "position": [
+        -3.2,
+        5.6,
+        0.6
+      ]
+    },
+    {
+      "name": "S09_cabinet",
+      "position": [
+        -1.4,
+        5.6,
+        1.4
+      ]
+    },
+    {
+      "name": "S10_bench",
+      "position": [
+        -7.8,
+        2,
+        0.8
+      ]
+    },
+    {
+      "name": "S11_passbox",
+      "position": [
+        -7.8,
+        5.5,
+        0.4
+      ]
+    },
+    {
+      "name": "S12_utility",
+      "position": [
+        8.4,
+        5.5,
+        1.2
+      ]
+    }
+  ]
+}
