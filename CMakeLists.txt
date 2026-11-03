@@ -69,6 +69,7 @@ install(PROGRAMS
     scripts/gas_environment_node.py
     scripts/gas_mapping_controller_node.py
     scripts/lrs_path_planner_node.py
+    scripts/mujoco_bridge_node.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

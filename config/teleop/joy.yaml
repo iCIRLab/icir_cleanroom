@@ -1,0 +1,29 @@
+# Gamepad driving for launch/mujoco_teleop.launch.py (Xbox controller via
+# joy_node). Hold LB to drive, add RB for turbo; releasing LB sends a stop.
+# Normal speeds match the cleanroom_amc Nav2 limits (0.18 m/s, 0.7 rad/s);
+# the bridge clamps to each robot's drive.max_linear/max_angular.
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.1
+    autorepeat_rate: 20.0
+
+teleop_twist_joy_node:
+  ros__parameters:
+    require_enable_button: true
+    # Xbox Wireless Controller over Bluetooth (hid_microsoft); over USB
+    # (xpad) the same buttons are LB 4, RB 5.
+    enable_button: 6         # LB
+    enable_turbo_button: 7   # RB
+    axis_linear:
+      x: 1                   # left stick vertical
+    scale_linear:
+      x: 0.18
+    scale_linear_turbo:
+      x: 0.35
+    axis_angular:
+      yaw: 0                 # left stick horizontal
+    scale_angular:
+      yaw: 0.7
+    scale_angular_turbo:
+      yaw: 1.0

@@ -1,0 +1,68 @@
+# MuJoCo robots for scripts/mujoco_bridge_node.py. Paths are relative to the
+# package share directory. The bridge publishes the same topics and frames as
+# the Gazebo plugins in urdf/mobile_amc.urdf, so Nav2 and the gas nodes run
+# unchanged on either simulator.
+mobile_amc:
+  model: models/mujoco/mobile_amc/mobile_amc.xml
+  # robot_state_publisher input; null publishes only the lidar frame as a
+  # static transform from the MJCF site.
+  description: urdf/mobile_amc.urdf
+  base_body: base_footprint
+  drive:
+    left: [wheel_left_vel]
+    right: [wheel_right_vel]
+    # libgazebo_ros_diff_drive <wheel_diameter> and <wheel_separation>.
+    wheel_radius: 0.1
+    wheel_separation: 0.56
+    track_scale: 1.0
+    max_linear: 0.5
+    max_angular: 1.5
+    # <max_wheel_acceleration> 0.6 m/s2 per wheel, as body (v, w) limits.
+    linear_acceleration: 0.6
+    angular_acceleration: 2.1
+  # Gazebo amc_lidar sensor on base_scan.
+  lidar:
+    site: base_scan
+    frame: base_scan
+    samples: 720
+    range_min: 0.12
+    range_max: 12.0
+    rate: 10.0
+  gas_sensor_site: gas_sensor_link
+
+husky_franka:
+  model: models/mujoco/husky_franka/husky_franka.xml
+  description: null
+  base_body: base_footprint
+  drive:
+    left: [front_left_motor, rear_left_motor]
+    right: [front_right_motor, rear_right_motor]
+    wheel_radius: 0.1651
+    wheel_separation: 0.555
+    # Skid steer turns as if the wheels were this many times further apart
+    # (icir_mujoco_nav2 mujoco.yaml bases.husky.motors.track_scale).
+    track_scale: 2.0
+    max_linear: 0.35
+    max_angular: 0.7
+    linear_acceleration: 0.45
+    angular_acceleration: 1.0
+  lidar:
+    site: lidar
+    frame: laser_link
+    samples: 360
+    range_min: 0.05
+    range_max: 20.0
+    rate: 10.0
+  gas_sensor_site: null
+  # Panda transport pose (icir_mujoco_nav2 config/panda/drive_poses.yaml):
+  # inside the Nav2 footprint and clear of the lidar. Held by the position
+  # actuators with gravity compensation.
+  arm_hold:
+    fer_joint1: 0.0
+    fer_joint2: -0.9
+    fer_joint3: 0.0
+    fer_joint4: -2.97
+    fer_joint5: 0.0
+    fer_joint6: 1.6
+    fer_joint7: 0.785
+    robotiq_85_left_knuckle_joint: 0.0
