@@ -143,7 +143,7 @@ def launch_setup(context):
             LaunchConfiguration('repeat_after_hrs'), value_type=bool),
     })
     model_path = os.path.join(
-        package_dir, 'models', 'aws_small_warehouse')
+        package_dir, 'models', 'gazebo', 'aws_small_warehouse')
     gazebo_model_path = model_path
     if os.environ.get('GAZEBO_MODEL_PATH'):
         gazebo_model_path += os.pathsep + os.environ['GAZEBO_MODEL_PATH']

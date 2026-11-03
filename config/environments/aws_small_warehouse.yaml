@@ -1,5 +1,5 @@
 environment:
-  world: worlds/aws_small_warehouse/small_warehouse.world
+  world: worlds/gazebo/aws_small_warehouse/small_warehouse.world
   map: maps/aws_small_warehouse/map.yaml
   navigation_profile: config/navigation/aws_warehouse_safe.yaml
   robot_spawn: {x: 0.0, y: 0.0, z: 0.01, yaw: 0.0}

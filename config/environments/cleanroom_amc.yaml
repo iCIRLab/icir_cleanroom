@@ -1,7 +1,7 @@
 # 20 x 14 m cleanroom with the mobile AMC robot.
 # Geometry and layout come from cleanroom_gas_sim; see docs/third_party/.
 environment:
-  world: worlds/cleanroom_amc/cleanroom.world
+  world: worlds/gazebo/cleanroom_amc/cleanroom.world
   map: maps/cleanroom_amc/cleanroom.yaml
   navigation_profile: config/navigation/cleanroom_amc_safe.yaml
   # Inside the airlock, west of the 1.6 m doorway at x = -6.5.

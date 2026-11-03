@@ -58,12 +58,12 @@ def test_warehouse_enables_reproducible_cluster_partition():
 
 def test_aws_world_model_dependencies_and_provenance_are_complete():
     world_path = (
-        PACKAGE_ROOT / 'worlds' / 'aws_small_warehouse' /
+        PACKAGE_ROOT / 'worlds' / 'gazebo' / 'aws_small_warehouse' /
         'small_warehouse.world')
     world = world_path.read_text(encoding='utf-8')
     model_names = set(re.findall(r'model://([^<]+)', world))
     assert model_names
-    model_root = PACKAGE_ROOT / 'models' / 'aws_small_warehouse'
+    model_root = PACKAGE_ROOT / 'models' / 'gazebo' / 'aws_small_warehouse'
     for model_name in model_names:
         model_dir = model_root / model_name
         assert (model_dir / 'model.config').is_file()

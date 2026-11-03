@@ -155,7 +155,7 @@ def test_campaign_uses_real_amc_world_robot_and_navigation(tmp_path):
         assert 'environment:=cleanroom_amc' in run['command']
         config = yaml.safe_load((c.root / 'seed_100' / run['method'] / 'run_config.yaml').read_text())
         env = config['profile']['environment']
-        assert env['world'] == 'worlds/cleanroom_amc/cleanroom.world'
+        assert env['world'] == 'worlds/gazebo/cleanroom_amc/cleanroom.world'
         assert env['map'] == 'maps/cleanroom_amc/cleanroom.yaml'
         assert env['robot']['entity'] == 'mobile_amc'
         assert env['robot']['model'] == 'urdf/mobile_amc.sdf'

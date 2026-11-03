@@ -1,5 +1,5 @@
 environment:
-  world: worlds/empty_50m/empty_lrs_50m.world
+  world: worlds/gazebo/empty_50m/empty_lrs_50m.world
   map: maps/empty_50m/map.yaml
   navigation_profile: config/navigation/empty_fast.yaml
   robot_spawn: {x: 0.0, y: 0.0, z: 0.01, yaw: 0.0}

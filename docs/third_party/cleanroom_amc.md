@@ -14,8 +14,8 @@
 
 | 이 패키지의 경로 | 원본 | 변경 |
 |---|---|---|
-| `worlds/cleanroom_amc/cleanroom.world` | `worlds/cleanroom.world` | 변경 없음 |
-| `worlds/cleanroom_amc/cleanroom_enclosed.world` | `worlds/cleanroom_enclosed.world` | 변경 없음 |
+| `worlds/gazebo/cleanroom_amc/cleanroom.world` | `worlds/cleanroom.world` | 변경 없음 |
+| `worlds/gazebo/cleanroom_amc/cleanroom_enclosed.world` | `worlds/cleanroom_enclosed.world` | 변경 없음 |
 | `maps/cleanroom_amc/cleanroom.pgm` | `maps/cleanroom.pgm` | 변경 없음 |
 | `maps/cleanroom_amc/cleanroom.yaml` | `maps/cleanroom.yaml` | 변경 없음 |
 | `config/cleanroom_amc/geometry.json` | `config/geometry.json` | 변경 없음 (참조용) |
