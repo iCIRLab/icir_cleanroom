@@ -1,0 +1,77 @@
+<mujoco model="mobile_amc">
+  <compiler angle="radian" eulerseq="XYZ" />
+  <worldbody>
+    <body name="base_footprint" pos="0 0 0.01">
+      <freejoint name="base_free" />
+      <geom type="box" size="0.42 0.25 0.12" pos="0 0 0.22" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.42 0.25 0.12" pos="0 0 0.22" contype="0" conaffinity="0" group="1" mass="0" rgba=".14 .20 .24 1" />
+      <geom type="box" size="0.33 0.24 0.42" pos="-0.02 0 0.76" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.33 0.24 0.42" pos="-0.02 0 0.76" contype="0" conaffinity="0" group="1" mass="0" rgba=".91 .94 .95 1" />
+      <geom type="box" size="0.02 0.3 0.055" pos="0.43 0 0.18" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.02 0.3 0.055" pos="0.43 0 0.18" contype="0" conaffinity="0" group="1" mass="0" rgba=".08 .12 .15 1" />
+      <geom type="box" size="0.02 0.3 0.055" pos="-0.43 0 0.18" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.02 0.3 0.055" pos="-0.43 0 0.18" contype="0" conaffinity="0" group="1" mass="0" rgba=".08 .12 .15 1" />
+      <geom type="box" size="0.007 0.195 0.34" pos="0.315 0 0.78" contype="0" conaffinity="0" group="1" mass="0" rgba=".12 .22 .28 1" />
+      <geom type="box" size="0.006 0.13 0.08" pos="0.327 0 1" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .62 .72 1" />
+      <geom type="box" size="0.01 0.17 0.16" pos="0.325 0 0.67" contype="0" conaffinity="0" group="1" mass="0" rgba=".45 .56 .61 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.54" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.572" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.604" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.636" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.668" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.7" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.008 0.15 0.006" pos="0.34 0 0.732" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .1 .13 1" />
+      <geom type="box" size="0.009 0.015 0.015" pos="0.329 -0.13 0.9" contype="0" conaffinity="0" group="1" mass="0" rgba=".2 .8 .45 1" />
+      <geom type="box" size="0.0175 0.0175 0.12" pos="0.24 0.16 1.24" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.0175 0.0175 0.12" pos="0.24 0.16 1.24" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .62 .66 1" />
+      <geom type="box" size="0.105 0.0225 0.0225" pos="0.345 0.16 1.35" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.105 0.0225 0.0225" pos="0.345 0.16 1.35" contype="0" conaffinity="0" group="1" mass="0" rgba=".09 .55 .66 1" />
+      <geom type="box" size="0.0075 0.16 0.125" pos="-0.357 0 0.84" contype="0" conaffinity="0" group="1" mass="0" rgba=".1 .24 .3 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.745" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.78" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.815" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.85" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.885" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.0065 0.135 0.006" pos="-0.37 0 0.92" contype="0" conaffinity="0" group="1" mass="0" rgba=".52 .63 .67 1" />
+      <geom type="box" size="0.03 0.03 0.035" pos="-0.24 0 1.21" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.03 0.03 0.035" pos="-0.24 0 1.21" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .8 .6 1" />
+      <geom type="box" size="0.05 0.02 0.02" pos="0.4 0.16 0.45" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.05 0.02 0.02" pos="0.4 0.16 0.45" contype="0" conaffinity="0" group="1" mass="0" rgba=".09 .55 .66 1" />
+      <geom type="cylinder" size="0.02 0.015" pos="0 0 0.45" contype="0" conaffinity="0" group="1" mass="0" rgba="1 .85 .1 1" />
+      <site name="gas_sensor_link" pos="0 0 0.45" size="0.02" rgba="0 1 0.5 1" group="4" />
+      <site name="gas_sensor_high_link" pos="0.45 0.16 1.35" size="0.02" rgba="0 1 0.5 1" group="4" />
+      <site name="purifier_inlet_link" pos="0.38 0 0.64" size="0.02" rgba="0 1 0.5 1" group="4" />
+      <site name="purifier_outlet_link" pos="-0.38 0 0.84" size="0.02" rgba="0 1 0.5 1" group="4" />
+      <body name="wheel_left_link" pos="0 0.28 0.1">
+        <joint name="wheel_left_joint" type="hinge" axis="0 1 0" damping="0.05" />
+        <geom type="cylinder" size="0.1 0.035" pos="0 0 0" euler="1.5708 0 0" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+        <geom type="cylinder" size="0.1 0.035" pos="0 0 0" euler="1.5708 0 0" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .06 .07 1" />
+        <inertial pos="0 0 0" mass="2" diaginertia="0.006 0.01 0.006" />
+      </body>
+      <body name="wheel_right_link" pos="0 -0.28 0.1">
+        <joint name="wheel_right_joint" type="hinge" axis="0 1 0" damping="0.05" />
+        <geom type="cylinder" size="0.1 0.035" pos="0 0 0" euler="1.5708 0 0" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+        <geom type="cylinder" size="0.1 0.035" pos="0 0 0" euler="1.5708 0 0" contype="0" conaffinity="0" group="1" mass="0" rgba=".05 .06 .07 1" />
+        <inertial pos="0 0 0" mass="2" diaginertia="0.006 0.01 0.006" />
+      </body>
+      <geom type="sphere" size="0.04" pos="0.32 0 0.04" group="3" rgba="1 0 0 0.3" friction="0 0 0" condim="1" priority="1" />
+      <geom type="sphere" size="0.04" pos="0.32 0 0.04" contype="0" conaffinity="0" group="1" mass="0" rgba="0.7 0.7 0.7 1" />
+      <geom type="sphere" size="0.04" pos="-0.32 0 0.04" group="3" rgba="1 0 0 0.3" friction="0 0 0" condim="1" priority="1" />
+      <geom type="sphere" size="0.04" pos="-0.32 0 0.04" contype="0" conaffinity="0" group="1" mass="0" rgba="0.7 0.7 0.7 1" />
+      <geom type="box" size="0.05 0.05 0.025" pos="0.37 0 0.36" group="3" rgba="1 0 0 0.3" friction="1.0 0.005 0.0001" />
+      <geom type="box" size="0.05 0.05 0.025" pos="0.37 0 0.36" contype="0" conaffinity="0" group="1" mass="0" rgba=".08 .12 .14 1" />
+      <site name="base_scan" pos="0.37 0 0.36" size="0.02" rgba="0 1 0.5 1" group="4" />
+      <inertial pos="0 0 0.45" mass="61.82" diaginertia="4 5 3" />
+      <site name="lidar" pos="0.37 0 0.4" size="0.02" group="4" />
+    </body>
+  </worldbody>
+  <actuator>
+    <velocity name="wheel_left_vel" joint="wheel_left_joint" kv="60" ctrlrange="-10 10" forcerange="-35 35" />
+    <velocity name="wheel_right_vel" joint="wheel_right_joint" kv="60" ctrlrange="-10 10" forcerange="-35 35" />
+  </actuator>
+  <sensor>
+    <framepos name="gas_sensor_pos" objtype="site" objname="gas_sensor_link" />
+    <jointvel name="wheel_left_joint_vel" joint="wheel_left_joint" />
+    <jointvel name="wheel_right_joint_vel" joint="wheel_right_joint" />
+  </sensor>
+</mujoco>

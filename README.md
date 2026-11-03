@@ -406,9 +406,13 @@ icir_cleanroom/
 ├── scripts/                        # ros2 run용 얇은 Python entrypoint
 ├── src/                            # Gazebo gas sensor C++ plugin
 ├── include/                        # C++ plugin header
-├── worlds/                         # Gazebo world
+├── worlds/
+│   ├── gazebo/                     # Gazebo world (.world)
+│   └── mujoco/                     # MuJoCo world (MJCF .xml)
 ├── maps/                           # Nav2 map
-├── models/                         # AWS warehouse Gazebo assets
+├── models/
+│   ├── gazebo/                     # AWS warehouse Gazebo assets
+│   └── mujoco/                     # MuJoCo 로봇 (mobile_amc, husky_franka)
 ├── urdf/                           # TurtleBot3 + gas sensor 모델
 ├── rviz/                           # RViz 표시 설정
 ├── test/                           # 알고리즘·설정·ROS contract 회귀 테스트

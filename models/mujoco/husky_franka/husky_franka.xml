@@ -1,0 +1,369 @@
+<mujoco model="husky_franka">
+  <compiler angle="radian" eulerseq="XYZ" autolimits="true" inertiafromgeom="false" fusestatic="false" balanceinertia="true" meshdir="meshes" />
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast" iterations="80" noslip_iterations="5" cone="elliptic" />
+  <default>
+    <geom solref="0.008 1" solimp="0.95 0.99 0.001" friction="0.8 0.005 0.0001" condim="4" />
+  </default>
+  <asset>
+    <mesh name="mesh_0" file="base_link_00df91ecdd209f.obj" />
+    <mesh name="mesh_1" file="wheel_1b4c045beccd0f.obj" />
+    <mesh name="mesh_2" file="top_chassis_cadc463ff87558.obj" />
+    <mesh name="mesh_3" file="bumper_fb7bb7698ce9d0.obj" />
+    <mesh name="mesh_4" file="user_rail_1c5c8a8e158827.obj" />
+    <mesh name="mesh_5" file="top_plate_0e2277b175ee2b.obj" />
+    <mesh name="mesh_6" file="link0_a8d2e2fee6dfbc.obj" />
+    <mesh name="mesh_7" file="link0_2feea5d95763e4.obj" />
+    <mesh name="mesh_8" file="link1_a3bee52c067443.obj" />
+    <mesh name="mesh_9" file="link1_0f3ee1d3b803a5.obj" />
+    <mesh name="mesh_10" file="link2_8b9ad27cf98ccf.obj" />
+    <mesh name="mesh_11" file="link2_fe272664c431bf.obj" />
+    <mesh name="mesh_12" file="link3_a54ddc7f4afc8a.obj" />
+    <mesh name="mesh_13" file="link3_8b8e4298134eb9.obj" />
+    <mesh name="mesh_14" file="link4_7eac9d03273769.obj" />
+    <mesh name="mesh_15" file="link4_d4f1dec32cc7f5.obj" />
+    <mesh name="mesh_16" file="link5_04e297600f2a88.obj" />
+    <mesh name="mesh_17" file="link5_3977b10053de95.obj" />
+    <mesh name="mesh_18" file="link6_bdd4b9ddb07140.obj" />
+    <mesh name="mesh_19" file="link6_87d364ea382d2f.obj" />
+    <mesh name="mesh_20" file="link7_297ed277f997f5.obj" />
+    <mesh name="mesh_21" file="link7_5140cfa98df2a9.obj" />
+    <mesh name="mesh_22" file="robotiq_base_536e4420b2eb02.obj" />
+    <mesh name="mesh_23" file="robotiq_base_2b64f6e7bf765c.obj" />
+    <mesh name="mesh_24" file="left_knuckle_151b68c382535a.obj" />
+    <mesh name="mesh_25" file="left_knuckle_3a18748a54cecd.obj" />
+    <mesh name="mesh_26" file="left_finger_7195b7d6ac2554.obj" />
+    <mesh name="mesh_27" file="left_finger_3871869dc1de3c.obj" />
+    <mesh name="mesh_28" file="left_finger_tip_f174e757c5cb95.obj" />
+    <mesh name="mesh_29" file="left_finger_tip_757ae0b37be784.obj" />
+    <mesh name="mesh_30" file="right_knuckle_109ef559f3fb26.obj" />
+    <mesh name="mesh_31" file="right_knuckle_eb6783fc3108fb.obj" />
+    <mesh name="mesh_32" file="right_finger_93c8c22e933917.obj" />
+    <mesh name="mesh_33" file="right_finger_4ee099288d5b11.obj" />
+    <mesh name="mesh_34" file="right_finger_tip_ff58495ccd43b2.obj" />
+    <mesh name="mesh_35" file="right_finger_tip_bff369c18e9ef6.obj" />
+    <mesh name="mesh_36" file="left_inner_knuckle_337620ae56d374.obj" />
+    <mesh name="mesh_37" file="left_inner_knuckle_fca2d45619b35b.obj" />
+    <mesh name="mesh_38" file="right_inner_knuckle_3d5072e94078b5.obj" />
+    <mesh name="mesh_39" file="right_inner_knuckle_6de210d2eb0b1f.obj" />
+  </asset>
+  <worldbody>
+    <body name="base_footprint" pos="0 0 0.002">
+      <freejoint name="floating_base" />
+      <body name="base_link" pos="0 0 0.13228" euler="0 0 0">
+        <inertial pos="-0.00065 0 0.062" mass="46.034" fullinertia="0.6022 1.7386 2.0296 -0.02364 -0.1197 -0.001544" />
+        <geom pos="0 0 0.061875" euler="0 0 0" name="base_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="box" size="0.4937 0.28545 0.061875" />
+        <geom pos="0 0 0.17562499999999998" euler="0 0 0" name="base_link_collision_1" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="box" size="0.39496 0.28545 0.051875" />
+        <geom pos="0 0 0" euler="0 0 0" name="base_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.2 0.2 0.2 1" type="mesh" mesh="mesh_0" />
+        <body name="front_left_wheel" pos="0.256 0.2775 0.03282" euler="0 0 0">
+          <joint name="front_left_wheel_joint" type="hinge" axis="0 1 0" damping="0.1" armature="2.0" />
+          <inertial pos="0 0 0" mass="2.637" fullinertia="0.02467 0.04411 0.02467 0 0 0" />
+          <geom pos="0 0 0" euler="1.5707963267948966 0 0" name="front_left_wheel_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="ellipsoid" size="0.1651 0.1651 0.05715" friction="0.8 0.005 0.0001" priority="1" solref="0.02 1" />
+          <geom pos="0 0 0" euler="0 0 0" name="front_left_wheel_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_1" />
+        </body>
+        <body name="front_right_wheel" pos="0.256 -0.2775 0.03282" euler="0 0 0">
+          <joint name="front_right_wheel_joint" type="hinge" axis="0 1 0" damping="0.1" armature="2.0" />
+          <inertial pos="0 0 0" mass="2.637" fullinertia="0.02467 0.04411 0.02467 0 0 0" />
+          <geom pos="0 0 0" euler="1.5707963267948966 0 0" name="front_right_wheel_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="ellipsoid" size="0.1651 0.1651 0.05715" friction="0.8 0.005 0.0001" priority="1" solref="0.02 1" />
+          <geom pos="0 0 0" euler="0 0 0" name="front_right_wheel_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_1" />
+        </body>
+        <body name="rear_left_wheel" pos="-0.256 0.2775 0.03282" euler="0 0 0">
+          <joint name="rear_left_wheel_joint" type="hinge" axis="0 1 0" damping="0.1" armature="2.0" />
+          <inertial pos="0 0 0" mass="2.637" fullinertia="0.02467 0.04411 0.02467 0 0 0" />
+          <geom pos="0 0 0" euler="1.5707963267948966 0 0" name="rear_left_wheel_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="ellipsoid" size="0.1651 0.1651 0.05715" friction="0.8 0.005 0.0001" priority="1" solref="0.02 1" />
+          <geom pos="0 0 0" euler="0 0 0" name="rear_left_wheel_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_1" />
+        </body>
+        <body name="rear_right_wheel" pos="-0.256 -0.2775 0.03282" euler="0 0 0">
+          <joint name="rear_right_wheel_joint" type="hinge" axis="0 1 0" damping="0.1" armature="2.0" />
+          <inertial pos="0 0 0" mass="2.637" fullinertia="0.02467 0.04411 0.02467 0 0 0" />
+          <geom pos="0 0 0" euler="1.5707963267948966 0 0" name="rear_right_wheel_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="ellipsoid" size="0.1651 0.1651 0.05715" friction="0.8 0.005 0.0001" priority="1" solref="0.02 1" />
+          <geom pos="0 0 0" euler="0 0 0" name="rear_right_wheel_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_1" />
+        </body>
+        <body name="top_chassis_link" pos="0 0 0" euler="0 0 0">
+          <geom pos="0 0 0" euler="0 0 0" name="top_chassis_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.95 0.75 0.05 1" type="mesh" mesh="mesh_2" />
+        </body>
+        <body name="front_bumper_link" pos="0.48 0 0.091" euler="0 0 0">
+          <geom pos="0 0 0" euler="0 0 0" name="front_bumper_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_3" />
+        </body>
+        <body name="rear_bumper_link" pos="-0.48 0 0.091" euler="0 0 3.141592653589793">
+          <geom pos="0 0 0" euler="0 0 0" name="rear_bumper_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="mesh" mesh="mesh_3" />
+        </body>
+        <body name="user_rail_link" pos="0.272 0 0.245" euler="0 0 0">
+          <geom pos="0 0 0" euler="0 0 0" name="user_rail_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.8 0.8 0.8 1" type="mesh" mesh="mesh_4" />
+        </body>
+        <body name="top_plate_link" pos="0.0812 0 0.245" euler="0 0 0">
+          <geom pos="0 0 0.00315" euler="0 0 0" name="top_plate_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="box" size="0.365 0.295 0.00315" />
+          <geom pos="0 0 0" euler="0 0 0" name="top_plate_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.6 0.6 0.6 1" type="mesh" mesh="mesh_5" />
+        </body>
+        <body name="lidar_mount" pos="-0.18950000000000003 0 0.5712999999999999" euler="0 0 0">
+          <geom pos="0 0 0.025" euler="0 0 0" name="lidar_mount_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="cylinder" size="0.035 0.025" />
+          <geom pos="0 0 -0.15999999999999998" euler="0 0 0" name="lidar_mount_collision_1" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="cylinder" size="0.015 0.16" />
+          <geom pos="0 0 0.025" euler="0 0 0" name="lidar_mount_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.12 0.12 1" type="cylinder" size="0.035 0.025" />
+          <geom pos="0 0 -0.15999999999999998" euler="0 0 0" name="lidar_mount_visual_1" group="1" contype="0" conaffinity="0" rgba="0.6 0.6 0.6 1" type="cylinder" size="0.015 0.16" />
+          <body name="laser_link" pos="0 0 0.03" euler="0 0 0">
+            <site name="lidar" size=".005" rgba="1 0 0 1" />
+          </body>
+        </body>
+        <body name="panda_mount" pos="0.14790000000000003 0 0.25129999999999997" euler="0 0 0">
+          <body name="fer_link0" pos="0 0 0" euler="0 0 0">
+            <inertial pos="-0.0172 0.0004 0.0745" mass="2.3966" fullinertia="0.009 0.0115 0.0085 0 0.002 0" />
+            <geom pos="0 0 0" euler="0 0 0" name="fer_link0_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_6" />
+            <geom pos="0 0 0" euler="0 0 0" name="fer_link0_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_7" />
+            <body name="fer_link1" pos="0 0 0.333" euler="0 0 0">
+              <joint name="fer_joint1" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-2.8973 2.8973" />
+              <inertial pos="0.00033 -0.02204 -0.04762" mass="2.7907" fullinertia="0.01564782655 0.01439883526 0.00500443991 5.31236e-06 -3.676721e-05 -0.00248480843" />
+              <geom pos="0 0 0" euler="0 0 0" name="fer_link1_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_8" />
+              <geom pos="0 0 0" euler="0 0 0" name="fer_link1_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_9" />
+              <body name="fer_link2" pos="0 0 0" euler="-1.570796326794897 0 0">
+                <joint name="fer_joint2" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-1.7628 1.7628" />
+                <inertial pos="0.00038 -0.09211 0.01908" mass="2.542" fullinertia="0.01662427728 0.00462501261 0.01545124526 3.086077e-05 8.3594e-06 0.0035589983" />
+                <geom pos="0 0 0" euler="0 0 0" name="fer_link2_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_10" />
+                <geom pos="0 0 0" euler="0 0 0" name="fer_link2_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_11" />
+                <body name="fer_link3" pos="0 -0.316 0" euler="1.570796326794897 0 0">
+                  <joint name="fer_joint3" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-2.8973 2.8973" />
+                  <inertial pos="0.05152 0.01696 -0.02971" mass="2.2513" fullinertia="0.00631741992 0.00866285493 0.00657804051 0.00097309955 0.00292525834 0.00093469224" />
+                  <geom pos="0 0 0" euler="0 0 0" name="fer_link3_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_12" />
+                  <geom pos="0 0 0" euler="0 0 0" name="fer_link3_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_13" />
+                  <body name="fer_link4" pos="0.0825 0 0" euler="1.570796326794897 0 0">
+                    <joint name="fer_joint4" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-3.0718 -0.0698" />
+                    <inertial pos="-0.05113 0.05825 0.01698" mass="2.2037" fullinertia="0.00784585566 0.00649543136 0.01003079917 -0.00339591957 0.00158704074 -0.00181477884" />
+                    <geom pos="0 0 0" euler="0 0 0" name="fer_link4_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_14" />
+                    <geom pos="0 0 0" euler="0 0 0" name="fer_link4_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_15" />
+                    <body name="fer_link5" pos="-0.0825 0.384 0" euler="-1.570796326794897 0 0">
+                      <joint name="fer_joint5" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-2.8973 2.8973" />
+                      <inertial pos="-0.00005 0.03730 -0.09280" mass="2.2855" fullinertia="0.02297014781 0.02095060919 0.00430606551 -9.49345e-06 -2.063156e-05 0.00382345782" />
+                      <geom pos="0 0 0" euler="0 0 0" name="fer_link5_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_16" />
+                      <geom pos="0 0 0" euler="0 0 0" name="fer_link5_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_17" />
+                      <body name="fer_link6" pos="0 0 0" euler="1.570796326794897 0 0">
+                        <joint name="fer_joint6" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-0.0175 3.7525" />
+                        <inertial pos="0.06572 -0.00371 0.00153" mass="1.353" fullinertia="0.00087964522 0.00277796968 0.00286701969 -0.00021487814 -0.00011911662 1.274322e-05" />
+                        <geom pos="0 0 0" euler="0 0 0" name="fer_link6_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_18" />
+                        <geom pos="0 0 0" euler="0 0 0" name="fer_link6_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_19" />
+                        <body name="fer_link7" pos="0.088 0 0" euler="1.570796326794897 0 0">
+                          <joint name="fer_joint7" type="hinge" axis="0 0 1" damping="0.1" armature="0.01" range="-2.8973 2.8973" />
+                          <inertial pos="0.00089 -0.00044 0.05491" mass="0.35973" fullinertia="0.00019541063 0.00019210361 0.00017936256 1.65231e-06 1.48826e-06 -1.31132e-06" />
+                          <geom pos="0 0 0" euler="0 0 0" name="fer_link7_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_20" />
+                          <geom pos="0 0 0" euler="0 0 0" name="fer_link7_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_21" />
+                          <body name="fer_link8" pos="0 0 0.107" euler="0 0 0">
+                            <body name="robotiq_85_base_link" pos="0 0 0" euler="0 0 0.7853981633974483">
+                              <inertial pos="0.0 2.274e-05 0.03232288" mass="6.6320197e-01" fullinertia="0.00051617816 0.00058802208 0.00039462776 2.936e-08 0 -3.2296e-07" />
+                              <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_base_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_22" />
+                              <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_base_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_23" />
+                              <body name="robotiq_85_left_knuckle_link" pos="0.03060114 0.0 0.05490452" euler="0 0 0">
+                                <joint name="robotiq_85_left_knuckle_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" range="0.0 0.8" />
+                                <inertial pos="0.01213197 0.0002 -0.00058647" mass="1.384773208e-02" fullinertia="3.5232e-07 2.31944e-06 2.23136e-06 0 1.1744e-07 0" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_knuckle_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_24" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_knuckle_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_25" />
+                                <body name="robotiq_85_left_finger_link" pos="0.03152616 0.0 -0.00376347" euler="0 0 0">
+                                  <inertial pos="0.00346899 -0.00079447 0.01867121" mass="4.260376752e-02" fullinertia="1.385792e-05 1.183208e-05 5.19672e-06 0 -2.17264e-06 0" />
+                                  <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_finger_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_26" />
+                                  <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_finger_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_27" />
+                                  <body name="robotiq_85_left_finger_tip_link" pos="0.00563134 0.0 0.04718515" euler="0 0 0">
+                                    <joint name="robotiq_85_left_finger_tip_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" />
+                                    <inertial pos="-0.01456706 -0.0008 0.01649701" mass="4.268588744e-02" fullinertia="1.048152e-05 1.197888e-05 4.22784e-06 0 3.5232e-06 0" />
+                                    <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_finger_tip_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_28" />
+                                    <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_finger_tip_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_29" />
+                                  </body>
+                                </body>
+                              </body>
+                              <body name="robotiq_85_right_knuckle_link" pos="-0.03060114 0.0 0.05490452" euler="0 0 0">
+                                <joint name="robotiq_85_right_knuckle_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" range="-0.8 0.0" />
+                                <inertial pos="-0.01213197 0.0002 -0.00058647" mass="1.384773208e-02" fullinertia="3.5232e-07 2.31944e-06 2.23136e-06 0 -1.1744e-07 0" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_knuckle_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_30" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_knuckle_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_31" />
+                                <body name="robotiq_85_right_finger_link" pos="-0.03152616 0.0 -0.00376347" euler="0 0 0">
+                                  <inertial pos="-0.00346899 -5.53e-06 0.01867121" mass="4.260376752000000e-02" fullinertia="1.385792e-05 1.183208e-05 5.19672e-06 0 2.17264e-06 0" />
+                                  <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_finger_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_32" />
+                                  <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_finger_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_33" />
+                                  <body name="robotiq_85_right_finger_tip_link" pos="-0.00563134 0.0 0.04718515" euler="0 0 0">
+                                    <joint name="robotiq_85_right_finger_tip_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" />
+                                    <inertial pos="0.01456706 5e-05 0.01649701" mass="4.268588744e-02" fullinertia="1.048152e-05 1.197888e-05 4.22784e-06 0 -3.5232e-06 0" />
+                                    <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_finger_tip_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_34" />
+                                    <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_finger_tip_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_35" />
+                                  </body>
+                                </body>
+                              </body>
+                              <body name="robotiq_85_left_inner_knuckle_link" pos="0.0127 0.0 0.06142" euler="0 0 0">
+                                <joint name="robotiq_85_left_inner_knuckle_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" />
+                                <inertial pos="0.01897699 0.00015001 0.02247101" mass="2.969376448e-02" fullinertia="9.57136e-06 8.69056e-06 8.19144e-06 0 -3.93424e-06 0" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_inner_knuckle_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_36" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_left_inner_knuckle_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_37" />
+                              </body>
+                              <body name="robotiq_85_right_inner_knuckle_link" pos="-0.0127 0.0 0.06142" euler="0 0 0">
+                                <joint name="robotiq_85_right_inner_knuckle_joint" type="hinge" axis="0 -1 0" damping="0.1" armature="0.01" />
+                                <inertial pos="-0.01926824 5.001e-05 0.02222178" mass="2.969376448e-02" fullinertia="9.42456e-06 8.69056e-06 8.33824e-06 0 3.9636e-06 0" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_inner_knuckle_link_collision_0" group="3" contype="2" conaffinity="3" rgba="0.5 0.5 0.5 0" type="mesh" mesh="mesh_38" />
+                                <geom pos="0 0 0" euler="0 0 0" name="robotiq_85_right_inner_knuckle_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.72 0.76 0.8 1" type="mesh" mesh="mesh_39" />
+                              </body>
+                              <body name="robotiq_85_tcp" pos="0 0 0.14" euler="0 0 0" />
+                              <body name="wrist_camera_link" pos="0 -0.055 0.04" euler="-1.5707963267948966 -1.5707963267948966 0">
+                                <geom pos="-0.0225 0 0" euler="0 0 0" name="wrist_camera_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.16 0.20 1" type="box" size="0.0175 0.025 0.014" />
+                                <geom pos="-0.004 0 0" euler="0 1.5707963267948966 0" name="wrist_camera_link_visual_1" group="1" contype="0" conaffinity="0" rgba="0.12 0.55 0.85 1" type="cylinder" size="0.009 0.001" />
+                                <body name="wrist_camera_optical_frame" pos="0 0 0" euler="-1.5707963267948966 0 -1.5707963267948966">
+                                  <camera name="wrist_camera" mode="fixed" quat="0 1 0 0" fovy="75.0" />
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+        <body name="base_camera_link" pos="0.45 0 0.20" euler="0 0 0">
+          <geom pos="-0.0225 0 0" euler="0 0 0" name="base_camera_link_visual_0" group="1" contype="0" conaffinity="0" rgba="0.12 0.16 0.20 1" type="box" size="0.0175 0.025 0.014" />
+          <geom pos="-0.004 0 0" euler="0 1.5707963267948966 0" name="base_camera_link_visual_1" group="1" contype="0" conaffinity="0" rgba="0.12 0.55 0.85 1" type="cylinder" size="0.009 0.001" />
+          <body name="base_camera_optical_frame" pos="0 0 0" euler="-1.5707963267948966 0 -1.5707963267948966">
+            <camera name="base_camera" mode="fixed" quat="0 1 0 0" fovy="65.0" />
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="base_footprint" body2="base_link" />
+    <exclude body1="base_footprint" body2="fer_link0" />
+    <exclude body1="base_footprint" body2="front_bumper_link" />
+    <exclude body1="base_footprint" body2="laser_link" />
+    <exclude body1="base_footprint" body2="lidar_mount" />
+    <exclude body1="base_footprint" body2="panda_mount" />
+    <exclude body1="base_footprint" body2="rear_bumper_link" />
+    <exclude body1="base_footprint" body2="top_chassis_link" />
+    <exclude body1="base_footprint" body2="user_rail_link" />
+    <exclude body1="base_link" body2="fer_link0" />
+    <exclude body1="base_link" body2="front_bumper_link" />
+    <exclude body1="base_link" body2="front_left_wheel" />
+    <exclude body1="base_link" body2="front_right_wheel" />
+    <exclude body1="base_link" body2="laser_link" />
+    <exclude body1="base_link" body2="lidar_mount" />
+    <exclude body1="base_link" body2="panda_mount" />
+    <exclude body1="base_link" body2="rear_bumper_link" />
+    <exclude body1="base_link" body2="rear_left_wheel" />
+    <exclude body1="base_link" body2="rear_right_wheel" />
+    <exclude body1="base_link" body2="top_chassis_link" />
+    <exclude body1="base_link" body2="user_rail_link" />
+    <exclude body1="fer_link0" body2="fer_link1" />
+    <exclude body1="fer_link0" body2="fer_link2" />
+    <exclude body1="fer_link0" body2="fer_link3" />
+    <exclude body1="fer_link0" body2="fer_link4" />
+    <exclude body1="fer_link0" body2="front_bumper_link" />
+    <exclude body1="fer_link0" body2="laser_link" />
+    <exclude body1="fer_link0" body2="lidar_mount" />
+    <exclude body1="fer_link0" body2="panda_mount" />
+    <exclude body1="fer_link0" body2="rear_bumper_link" />
+    <exclude body1="fer_link0" body2="top_chassis_link" />
+    <exclude body1="fer_link0" body2="user_rail_link" />
+    <exclude body1="fer_link1" body2="fer_link2" />
+    <exclude body1="fer_link1" body2="fer_link3" />
+    <exclude body1="fer_link1" body2="fer_link4" />
+    <exclude body1="fer_link2" body2="fer_link3" />
+    <exclude body1="fer_link2" body2="fer_link4" />
+    <exclude body1="fer_link2" body2="fer_link6" />
+    <exclude body1="fer_link3" body2="fer_link4" />
+    <exclude body1="fer_link3" body2="fer_link5" />
+    <exclude body1="fer_link3" body2="fer_link6" />
+    <exclude body1="fer_link3" body2="fer_link7" />
+    <exclude body1="fer_link4" body2="fer_link5" />
+    <exclude body1="fer_link4" body2="fer_link6" />
+    <exclude body1="fer_link4" body2="fer_link7" />
+    <exclude body1="fer_link4" body2="fer_link8" />
+    <exclude body1="fer_link5" body2="fer_link6" />
+    <exclude body1="fer_link5" body2="fer_link7" />
+    <exclude body1="fer_link6" body2="fer_link7" />
+    <exclude body1="fer_link6" body2="fer_link8" />
+    <exclude body1="fer_link7" body2="fer_link8" />
+    <exclude body1="front_bumper_link" body2="laser_link" />
+    <exclude body1="front_bumper_link" body2="lidar_mount" />
+    <exclude body1="front_bumper_link" body2="panda_mount" />
+    <exclude body1="front_bumper_link" body2="rear_bumper_link" />
+    <exclude body1="front_bumper_link" body2="top_chassis_link" />
+    <exclude body1="front_bumper_link" body2="user_rail_link" />
+    <exclude body1="laser_link" body2="lidar_mount" />
+    <exclude body1="laser_link" body2="panda_mount" />
+    <exclude body1="laser_link" body2="rear_bumper_link" />
+    <exclude body1="laser_link" body2="top_chassis_link" />
+    <exclude body1="laser_link" body2="user_rail_link" />
+    <exclude body1="lidar_mount" body2="panda_mount" />
+    <exclude body1="lidar_mount" body2="rear_bumper_link" />
+    <exclude body1="lidar_mount" body2="top_chassis_link" />
+    <exclude body1="lidar_mount" body2="user_rail_link" />
+    <exclude body1="panda_mount" body2="rear_bumper_link" />
+    <exclude body1="panda_mount" body2="top_chassis_link" />
+    <exclude body1="panda_mount" body2="user_rail_link" />
+    <exclude body1="rear_bumper_link" body2="top_chassis_link" />
+    <exclude body1="rear_bumper_link" body2="user_rail_link" />
+    <exclude body1="top_chassis_link" body2="user_rail_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_left_knuckle_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_left_finger_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_left_finger_tip_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_left_inner_knuckle_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_right_finger_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_right_finger_tip_link" />
+    <exclude body1="robotiq_85_base_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_left_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_tip_link" body2="robotiq_85_left_knuckle_link" />
+    <exclude body1="robotiq_85_left_inner_knuckle_link" body2="robotiq_85_left_knuckle_link" />
+    <exclude body1="robotiq_85_left_knuckle_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_left_knuckle_link" body2="robotiq_85_right_finger_link" />
+    <exclude body1="robotiq_85_left_knuckle_link" body2="robotiq_85_right_finger_tip_link" />
+    <exclude body1="robotiq_85_left_knuckle_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_left_finger_tip_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_left_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_right_finger_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_right_finger_tip_link" />
+    <exclude body1="robotiq_85_left_finger_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_tip_link" body2="robotiq_85_left_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_tip_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_left_finger_tip_link" body2="robotiq_85_right_finger_link" />
+    <exclude body1="robotiq_85_left_finger_tip_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_left_inner_knuckle_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_left_inner_knuckle_link" body2="robotiq_85_right_finger_link" />
+    <exclude body1="robotiq_85_left_inner_knuckle_link" body2="robotiq_85_right_finger_tip_link" />
+    <exclude body1="robotiq_85_left_inner_knuckle_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_right_finger_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_right_finger_tip_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_right_inner_knuckle_link" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="robotiq_85_right_finger_link" body2="robotiq_85_right_finger_tip_link" />
+    <exclude body1="robotiq_85_right_finger_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="robotiq_85_right_finger_tip_link" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="fer_link7" body2="robotiq_85_base_link" />
+    <exclude body1="fer_link7" body2="robotiq_85_left_knuckle_link" />
+    <exclude body1="fer_link7" body2="robotiq_85_left_inner_knuckle_link" />
+    <exclude body1="fer_link7" body2="robotiq_85_right_knuckle_link" />
+    <exclude body1="fer_link7" body2="robotiq_85_right_inner_knuckle_link" />
+    <exclude body1="base_link" body2="top_plate_link" />
+    <exclude body1="top_chassis_link" body2="top_plate_link" />
+    <exclude body1="top_plate_link" body2="user_rail_link" />
+    <exclude body1="fer_link0" body2="top_plate_link" />
+    <exclude body1="lidar_mount" body2="top_plate_link" />
+    <exclude body1="laser_link" body2="top_plate_link" />
+    <exclude body1="panda_mount" body2="top_plate_link" />
+    <exclude body1="base_footprint" body2="top_plate_link" />
+  </contact>
+  <equality>
+    <joint joint1="robotiq_85_right_knuckle_joint" joint2="robotiq_85_left_knuckle_joint" polycoef="0 -1 0 0 0" solref="0.004 1" />
+    <joint joint1="robotiq_85_left_inner_knuckle_joint" joint2="robotiq_85_left_knuckle_joint" polycoef="0 1 0 0 0" solref="0.004 1" />
+    <joint joint1="robotiq_85_right_inner_knuckle_joint" joint2="robotiq_85_left_knuckle_joint" polycoef="0 -1 0 0 0" solref="0.004 1" />
+    <joint joint1="robotiq_85_left_finger_tip_joint" joint2="robotiq_85_left_knuckle_joint" polycoef="0 -1 0 0 0" solref="0.004 1" />
+    <joint joint1="robotiq_85_right_finger_tip_joint" joint2="robotiq_85_left_knuckle_joint" polycoef="0 1 0 0 0" solref="0.004 1" />
+  </equality>
+  <actuator>
+    <velocity name="front_left_motor" joint="front_left_wheel_joint" kv="200.0" ctrlrange="-8 8" forcerange="-80 80" />
+    <velocity name="rear_left_motor" joint="rear_left_wheel_joint" kv="200.0" ctrlrange="-8 8" forcerange="-80 80" />
+    <velocity name="front_right_motor" joint="front_right_wheel_joint" kv="200.0" ctrlrange="-8 8" forcerange="-80 80" />
+    <velocity name="rear_right_motor" joint="rear_right_wheel_joint" kv="200.0" ctrlrange="-8 8" forcerange="-80 80" />
+    <position name="fer_joint1_position" joint="fer_joint1" kp="500.0" kv="35.0" ctrlrange="-2.8973 2.8973" forcerange="-87 87" />
+    <position name="fer_joint2_position" joint="fer_joint2" kp="500.0" kv="35.0" ctrlrange="-1.7628 1.7628" forcerange="-87 87" />
+    <position name="fer_joint3_position" joint="fer_joint3" kp="500.0" kv="35.0" ctrlrange="-2.8973 2.8973" forcerange="-87 87" />
+    <position name="fer_joint4_position" joint="fer_joint4" kp="500.0" kv="35.0" ctrlrange="-3.0718 -0.0698" forcerange="-87 87" />
+    <position name="fer_joint5_position" joint="fer_joint5" kp="500.0" kv="35.0" ctrlrange="-2.8973 2.8973" forcerange="-12 12" />
+    <position name="fer_joint6_position" joint="fer_joint6" kp="500.0" kv="35.0" ctrlrange="-0.0175 3.7525" forcerange="-12 12" />
+    <position name="fer_joint7_position" joint="fer_joint7" kp="500.0" kv="35.0" ctrlrange="-2.8973 2.8973" forcerange="-12 12" />
+    <position name="robotiq_85_left_knuckle_joint_position" joint="robotiq_85_left_knuckle_joint" kp="30.0" kv="3.0" ctrlrange="0.0 0.8" forcerange="-3 3" />
+  </actuator>
+</mujoco>
