@@ -22,7 +22,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_methods_once import FIELDS, METHODS, free_port, read_result, save_summary  # noqa: E402
+from run_methods_once import (  # noqa: E402
+    FIELDS, METHODS, add_simulator_arguments, check_simulator_arguments, free_port, read_result,
+    save_summary)
 from run_methods_random import RANDOM_SOURCE_MODES, prepare_random, run_one_paused  # noqa: E402
 
 
@@ -41,7 +43,9 @@ def main(argv=None):
     parser.add_argument('--timeout', type=float, default=1800.)
     parser.add_argument('--gui', action='store_true', help='Only takes effect the first time this round is created')
     parser.add_argument('--empty-history', action='store_true', help='Only takes effect the first time this round is created')
+    add_simulator_arguments(parser)
     args = parser.parse_args(argv)
+    check_simulator_arguments(parser, args)
 
     from ament_index_python.packages import get_package_share_directory
     package = Path(get_package_share_directory('icir_cleanroom'))
@@ -51,12 +55,16 @@ def main(argv=None):
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
         if (manifest.get('environment') != args.environment or manifest['seed'] != args.seed
-                or manifest['source_mode'] != args.source_mode):
-            parser.error(f'{root} already holds a different environment/seed/source_mode; pass --output for a new folder')
+                or manifest['source_mode'] != args.source_mode
+                or manifest.get('simulator', 'gazebo') != args.sim
+                or manifest.get('robot') != args.robot):
+            parser.error(f'{root} already holds a different environment/seed/source_mode/simulator; '
+                         'pass --output for a new folder')
     else:
         domain = args.ros_domain_id if args.ros_domain_id is not None else __import__('random').SystemRandom().randrange(20, 90)
         manifest = prepare_random(root, package, args.environment, args.seed,
-                                  args.source_mode, domain, args.gui, args.empty_history)
+                                  args.source_mode, domain, args.gui, args.empty_history,
+                                  args.sim, args.robot)
         print(f'New round created: {root} (seed={args.seed}, source_mode={args.source_mode})', flush=True)
 
     run = next(r for r in manifest['runs'] if r['method'] == args.method)

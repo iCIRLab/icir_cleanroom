@@ -17,6 +17,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 from icir_cleanroom.gas_mapping.navigation_profile import (
     load_navigation_settings, navigation_goal_clearance, render_robot_sdf,
     validated_robot)
+from icir_cleanroom.mujoco_sim.scene import load_robot_config
 
 
 def remove_temporary_file(path):
@@ -33,7 +34,6 @@ def load_yaml(path):
 
 def launch_setup(context):
     package_dir = get_package_share_directory('icir_cleanroom')
-    gazebo_dir = get_package_share_directory('gazebo_ros')
     environment_name = LaunchConfiguration('environment').perform(context)
     profile_path = os.path.join(
         package_dir, 'config', 'environments', f'{environment_name}.yaml')
@@ -64,12 +64,34 @@ def launch_setup(context):
         raise RuntimeError(
             f'Invalid environment robot block in {profile_path}: {error}') \
             from error
-    robot_urdf = os.path.join(package_dir, robot['description'])
-    robot_sdf = os.path.join(package_dir, robot['model'])
-    for description, path in (
-            ('robot description', robot_urdf), ('robot model', robot_sdf)):
-        if not os.path.isfile(path):
-            raise RuntimeError(f'Environment {description} not found: {path}')
+    simulator = LaunchConfiguration('sim').perform(context)
+    if simulator == 'gazebo':
+        robot_urdf = os.path.join(package_dir, robot['description'])
+        robot_sdf = os.path.join(package_dir, robot['model'])
+        for description, path in (
+                ('robot description', robot_urdf),
+                ('robot model', robot_sdf)):
+            if not os.path.isfile(path):
+                raise RuntimeError(
+                    f'Environment {description} not found: {path}')
+    elif simulator == 'mujoco':
+        # The MuJoCo world shares the environment's name, map, and profile.
+        if not os.path.isdir(os.path.join(
+                package_dir, 'worlds', 'mujoco', environment_name)):
+            raise RuntimeError(
+                f'Environment {environment_name} has no MuJoCo world in '
+                f'worlds/mujoco/{environment_name}')
+        robot_name = (LaunchConfiguration('robot').perform(context)
+                      or robot['entity'])
+        try:
+            mujoco_robot = load_robot_config(os.path.join(
+                package_dir, 'config', 'mujoco', 'robots.yaml'), robot_name)
+        except ValueError as error:
+            raise RuntimeError(str(error)) from error
+        robot_urdf = (os.path.join(package_dir, mujoco_robot['description'])
+                      if mujoco_robot.get('description') else None)
+    else:
+        raise RuntimeError(f'sim must be gazebo or mujoco, got {simulator!r}')
     rviz = os.path.join(package_dir, 'rviz', 'cleanroom_empty.rviz')
     base_nav2_params = run_config.get('base_nav2_params') or os.path.join(
         package_dir, 'config', 'nav2_params.yaml')
@@ -91,21 +113,25 @@ def launch_setup(context):
             'gas_mapping_controller_node']['ros__parameters']
     mapping_params = run_config.get('controller', mapping_params)
 
-    with open(robot_urdf, 'r', encoding='utf-8') as stream:
-        robot_description = stream.read()
-    with open(robot_sdf, 'r', encoding='utf-8') as stream:
-        robot_xml = stream.read()
-    try:
-        robot_xml = render_robot_sdf(
-            robot_xml, robot_motion, robot['lidar_sensor_name'])
-    except (TypeError, ValueError) as error:
-        raise RuntimeError(f'Invalid robot motion profile: {error}') from error
-    with tempfile.NamedTemporaryFile(
-            mode='w', prefix=f'icir_mapping_{robot["entity"]}_', suffix='.sdf',
-            delete=False, encoding='utf-8') as stream:
-        stream.write(robot_xml)
-        temporary_sdf = stream.name
-    atexit.register(remove_temporary_file, temporary_sdf)
+    robot_description = None
+    if robot_urdf:
+        with open(robot_urdf, 'r', encoding='utf-8') as stream:
+            robot_description = stream.read()
+    if simulator == 'gazebo':
+        with open(robot_sdf, 'r', encoding='utf-8') as stream:
+            robot_xml = stream.read()
+        try:
+            robot_xml = render_robot_sdf(
+                robot_xml, robot_motion, robot['lidar_sensor_name'])
+        except (TypeError, ValueError) as error:
+            raise RuntimeError(
+                f'Invalid robot motion profile: {error}') from error
+        with tempfile.NamedTemporaryFile(
+                mode='w', prefix=f'icir_mapping_{robot["entity"]}_',
+                suffix='.sdf', delete=False, encoding='utf-8') as stream:
+            stream.write(robot_xml)
+            temporary_sdf = stream.name
+        atexit.register(remove_temporary_file, temporary_sdf)
 
     spawn = environment['robot_spawn']
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -142,36 +168,50 @@ def launch_setup(context):
         'repeat_after_hrs': ParameterValue(
             LaunchConfiguration('repeat_after_hrs'), value_type=bool),
     })
-    model_path = os.path.join(
-        package_dir, 'models', 'gazebo', 'aws_small_warehouse')
-    gazebo_model_path = model_path
-    if os.environ.get('GAZEBO_MODEL_PATH'):
-        gazebo_model_path += os.pathsep + os.environ['GAZEBO_MODEL_PATH']
-
-    actions = [
-        SetEnvironmentVariable('GAZEBO_MODEL_PATH', gazebo_model_path),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(
-                gazebo_dir, 'launch', 'gzserver.launch.py')),
-            launch_arguments={'world': world}.items()),
-        ExecuteProcess(
-            cmd=['gzclient'], output='screen',
-            condition=UnlessCondition(headless)),
-        Node(
+    if simulator == 'gazebo':
+        gazebo_dir = get_package_share_directory('gazebo_ros')
+        model_path = os.path.join(
+            package_dir, 'models', 'gazebo', 'aws_small_warehouse')
+        gazebo_model_path = model_path
+        if os.environ.get('GAZEBO_MODEL_PATH'):
+            gazebo_model_path += os.pathsep + os.environ['GAZEBO_MODEL_PATH']
+        actions = [
+            SetEnvironmentVariable('GAZEBO_MODEL_PATH', gazebo_model_path),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(os.path.join(
+                    gazebo_dir, 'launch', 'gzserver.launch.py')),
+                launch_arguments={'world': world}.items()),
+            ExecuteProcess(
+                cmd=['gzclient'], output='screen',
+                condition=UnlessCondition(headless)),
+            Node(
+                package='gazebo_ros', executable='spawn_entity.py',
+                arguments=[
+                    '-file', temporary_sdf,
+                    '-entity', robot['entity'],
+                    '-x', str(spawn['x']), '-y', str(spawn['y']),
+                    '-z', str(spawn['z']), '-Y', str(spawn['yaw'])],
+                output='screen'),
+        ]
+    else:
+        actions = [Node(
+            package='icir_cleanroom', executable='mujoco_bridge_node.py',
+            parameters=[{
+                'world': environment_name, 'robot': robot_name,
+                'x': float(spawn['x']), 'y': float(spawn['y']),
+                'yaw': float(spawn['yaw']),
+                'viewer': headless.perform(context).lower() != 'true'}],
+            output='screen')]
+    if robot_description is not None:
+        actions.append(Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'robot_description': robot_description}],
-            output='screen'),
-        Node(
-            package='gazebo_ros', executable='spawn_entity.py',
-            arguments=[
-                '-file', temporary_sdf,
-                '-entity', robot['entity'],
-                '-x', str(spawn['x']), '-y', str(spawn['y']),
-                '-z', str(spawn['z']), '-Y', str(spawn['yaw'])],
-            output='screen'),
+            output='screen'))
+
+    actions += [
         Node(
             package='tf2_ros', executable='static_transform_publisher',
             arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
@@ -221,6 +261,12 @@ def generate_launch_description():
         DeclareLaunchArgument('environment', default_value='cleanroom_amc'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument('sim', default_value='gazebo',
+                              choices=['gazebo', 'mujoco']),
+        DeclareLaunchArgument(
+            'robot', default_value='',
+            description='MuJoCo robot in config/mujoco/robots.yaml; '
+                        'default: the environment robot entity'),
         DeclareLaunchArgument('save_history', default_value='true',
                               choices=['true', 'false'],
                               description='Write history files; existing history is still loaded'),

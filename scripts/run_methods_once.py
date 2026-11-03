@@ -262,7 +262,24 @@ def free_port():
         return sock.getsockname()[1]
 
 
-def prepare(root, package, environment, seed, domain, gui, empty_history):
+def add_simulator_arguments(parser):
+    parser.add_argument('--sim', choices=('gazebo', 'mujoco'), default='gazebo',
+                        help='Simulator for every method launch (default gazebo)')
+    parser.add_argument('--robot', help='MuJoCo robot in config/mujoco/robots.yaml '
+                                        '(default: the environment robot); needs --sim mujoco')
+
+
+def check_simulator_arguments(parser, args):
+    if args.robot and args.sim != 'mujoco':
+        parser.error('--robot selects a MuJoCo robot; add --sim mujoco')
+
+
+def simulator_launch_arguments(simulator, robot):
+    return [f'sim:={simulator}'] + ([f'robot:={robot}'] if robot else [])
+
+
+def prepare(root, package, environment, seed, domain, gui, empty_history,
+            simulator='gazebo', robot=None):
     """Freeze profiles/history without writing the user's existing settings."""
     root.mkdir(parents=True, exist_ok=False)
     snapshot = root/'snapshot'
@@ -284,6 +301,7 @@ def prepare(root, package, environment, seed, domain, gui, empty_history):
     shutil.copy2(package/profile['environment']['navigation_profile'], snapshot/'navigation_profile.yaml')
     profile['environment']['navigation_profile'] = str(snapshot/'navigation_profile.yaml')
     manifest = dict(environment=environment, methods=METHODS, seed=seed,
+                    simulator=simulator, robot=robot,
                     ros_domain_base=domain, gui=gui, package=str(package),
                     initial_history=str(original_history), history_copied=copied,
                     save_history=False, repeat_after_hrs=False,
@@ -303,7 +321,8 @@ def prepare(root, package, environment, seed, domain, gui, empty_history):
         command = ['ros2', 'launch', 'icir_cleanroom', 'gas_mapping.launch.py',
                    f'environment:={environment}', f'method:={method}',
                    'repeat_after_hrs:=false', 'save_history:=false',
-                   f'headless:={str(not gui).lower()}', f'run_config:={run_config}']
+                   f'headless:={str(not gui).lower()}', f'run_config:={run_config}',
+                   *simulator_launch_arguments(simulator, robot)]
         manifest['runs'].append(dict(method=method, command=command, ros_domain_id=domain+index))
     (root/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     return manifest
@@ -319,7 +338,9 @@ def main(argv=None):
     parser.add_argument('--gui', action='store_true', help='Show Gazebo and RViz; default headless')
     parser.add_argument('--empty-history', action='store_true', help='Start all methods without existing history; original file stays untouched')
     parser.add_argument('--dry-run', action='store_true', help='Prepare configs and summaries, print commands; start no processes')
+    add_simulator_arguments(parser)
     args = parser.parse_args(argv)
+    check_simulator_arguments(parser, args)
     if not math.isfinite(args.timeout) or args.timeout <= 0 or args.seed < 0:
         parser.error('timeout must be positive and finite, seed must be nonnegative')
     if args.ros_domain_id is not None and not 0 <= args.ros_domain_id <= 94:
@@ -330,7 +351,8 @@ def main(argv=None):
     root = (args.output or Path.cwd()/'results'/datetime.now(timezone.utc).strftime('methods_%Y%m%dT%H%M%S_%fZ')).expanduser().resolve()
     if "LaunchConfiguration('run_config')" not in (package/'launch/gas_mapping.launch.py').read_text():
         parser.error('Installed launch is outdated; build icir_cleanroom and source install/setup.bash first')
-    manifest = prepare(root, package, args.environment, args.seed, domain, args.gui, args.empty_history)
+    manifest = prepare(root, package, args.environment, args.seed, domain, args.gui, args.empty_history,
+                       args.sim, args.robot)
     manifest['timeout_wall_seconds'] = args.timeout
     manifest['code_version'] = code_version()
     manifest['dry_run'] = args.dry_run

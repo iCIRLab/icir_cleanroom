@@ -32,7 +32,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_methods_once import (  # noqa: E402
-    FIELDS, METHODS, OwnedLaunch, free_port, read_result, save_summary)
+    FIELDS, METHODS, OwnedLaunch, add_simulator_arguments, check_simulator_arguments,
+    free_port, read_result, save_summary, simulator_launch_arguments)
 
 RANDOM_SOURCE_MODES = ('random_after_peak', 'recurrent_hotspots_after_peak')
 
@@ -97,7 +98,8 @@ def run_one_paused(method, folder, command, env, timeout, pause, poll=.5):
     return result, interrupted or result['runner_status'] == 'cleanup_failed'
 
 
-def prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history):
+def prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history,
+                   simulator='gazebo', robot=None):
     """Same freeze as run_methods_once.prepare, plus a shared random source override."""
     root.mkdir(parents=True, exist_ok=False)
     snapshot = root/'snapshot'
@@ -122,6 +124,7 @@ def prepare_random(root, package, environment, seed, source_mode, domain, gui, e
     shutil.copy2(package/profile['environment']['navigation_profile'], snapshot/'navigation_profile.yaml')
     profile['environment']['navigation_profile'] = str(snapshot/'navigation_profile.yaml')
     manifest = dict(environment=environment, methods=METHODS, seed=seed, source_mode=source_mode,
+                    simulator=simulator, robot=robot,
                     ros_domain_base=domain, gui=gui, package=str(package),
                     initial_history=str(original_history), history_copied=copied,
                     save_history=False, repeat_after_hrs=False,
@@ -143,16 +146,18 @@ def prepare_random(root, package, environment, seed, source_mode, domain, gui, e
         command = ['ros2', 'launch', 'icir_cleanroom', 'gas_mapping.launch.py',
                    f'environment:={environment}', f'method:={method}',
                    'repeat_after_hrs:=false', 'save_history:=false',
-                   f'headless:={str(not gui).lower()}', f'run_config:={run_config}']
+                   f'headless:={str(not gui).lower()}', f'run_config:={run_config}',
+                   *simulator_launch_arguments(simulator, robot)]
         manifest['runs'].append(dict(method=method, command=command, ros_domain_id=domain+index))
     (root/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     return manifest
 
 
 def run_round(root, package, environment, seed, source_mode, domain, gui,
-              empty_history, timeout, dry_run, is_last_round):
+              empty_history, timeout, dry_run, is_last_round, simulator='gazebo', robot=None):
     """Run M1..M7 once each under one shared random source; return (exit_code, stopped)."""
-    manifest = prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history)
+    manifest = prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history,
+                              simulator, robot)
     manifest['timeout_wall_seconds'] = timeout
     manifest['dry_run'] = dry_run
     rows = [dict(method_id=m, runner_status='not_started') for m in METHODS]
@@ -211,7 +216,9 @@ def main(argv=None):
     parser.add_argument('--gui', action='store_true', help='Show Gazebo and RViz; default headless')
     parser.add_argument('--empty-history', action='store_true', help='Start all methods without existing history; original file stays untouched')
     parser.add_argument('--dry-run', action='store_true', help='Prepare configs and summaries, print commands; start no processes')
+    add_simulator_arguments(parser)
     args = parser.parse_args(argv)
+    check_simulator_arguments(parser, args)
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error('timeout must be positive and finite')
     if args.rounds < 1:
@@ -242,7 +249,7 @@ def main(argv=None):
         round_exit_code, stopped = run_round(
             root, package, args.environment, seed, args.source_mode, domain,
             args.gui, args.empty_history, args.timeout, args.dry_run,
-            round_index == args.rounds-1)
+            round_index == args.rounds-1, args.sim, args.robot)
         exit_code = exit_code or round_exit_code
         if not single_round:
             batch_manifest['rounds'].append(dict(

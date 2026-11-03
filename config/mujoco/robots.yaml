@@ -4,8 +4,8 @@
 # unchanged on either simulator.
 mobile_amc:
   model: models/mujoco/mobile_amc/mobile_amc.xml
-  # robot_state_publisher input; null publishes only the lidar frame as a
-  # static transform from the MJCF site.
+  # robot_state_publisher input; null makes the bridge publish base_link and
+  # the lidar frame as static transforms from the MJCF instead.
   description: urdf/mobile_amc.urdf
   base_body: base_footprint
   drive:
@@ -54,6 +54,9 @@ husky_franka:
     range_max: 20.0
     rate: 10.0
   gas_sensor_site: null
+  # Base-frame point sampled by gas_environment_node (only x, y matter), at
+  # the mobile_amc gas_sensor_link height.
+  gas_sensor_offset: [0.0, 0.0, 0.45]
   # Panda transport pose (icir_mujoco_nav2 config/panda/drive_poses.yaml):
   # inside the Nav2 footprint and clear of the lidar. Held by the position
   # actuators with gravity compensation.

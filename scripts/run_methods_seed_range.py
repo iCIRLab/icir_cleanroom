@@ -25,22 +25,27 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_methods_once import METHODS, free_port, read_result, save_summary  # noqa: E402
+from run_methods_once import (  # noqa: E402
+    METHODS, add_simulator_arguments, check_simulator_arguments, free_port, read_result,
+    save_summary)
 from run_methods_random import RANDOM_SOURCE_MODES, prepare_random, run_one_paused  # noqa: E402
 
 
 def run_seed_round(root, package, environment, seed, source_mode, domain, gui,
-                   empty_history, timeout, is_last_seed, pause=True):
+                   empty_history, timeout, is_last_seed, pause=True, simulator='gazebo', robot=None):
     """Run (or resume) M1..M7 for one seed; return (exit_code, stopped)."""
     manifest_path = root/'manifest.json'
     if manifest_path.exists():
         import json
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
         if (manifest.get('environment') != environment or manifest['seed'] != seed
-                or manifest['source_mode'] != source_mode):
-            raise ValueError(f'{root} already holds a different environment/seed/source_mode')
+                or manifest['source_mode'] != source_mode
+                or manifest.get('simulator', 'gazebo') != simulator
+                or manifest.get('robot') != robot):
+            raise ValueError(f'{root} already holds a different environment/seed/source_mode/simulator')
     else:
-        manifest = prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history)
+        manifest = prepare_random(root, package, environment, seed, source_mode, domain, gui, empty_history,
+                                  simulator, robot)
     rows = []
     for run in manifest['runs']:
         existing, _ = read_result(root/run['method']/'hrs', run['method'])
@@ -101,7 +106,9 @@ def main(argv=None):
                          help='With --gui, skip the Enter-to-continue prompt and move straight to the '
                               'next method/seed instead of pausing for a screenshot')
     parser.add_argument('--empty-history', action='store_true')
+    add_simulator_arguments(parser)
     args = parser.parse_args(argv)
+    check_simulator_arguments(parser, args)
 
     if args.count < 1:
         parser.error('count must be at least 1')
@@ -123,7 +130,7 @@ def main(argv=None):
         round_exit_code, stopped = run_seed_round(
             root, package, args.environment, seed, args.source_mode, domain,
             args.gui, args.empty_history, args.timeout, offset == args.count-1,
-            pause=not args.no_pause)
+            pause=not args.no_pause, simulator=args.sim, robot=args.robot)
         exit_code = exit_code or round_exit_code
         if stopped:
             print(f'Seed {seed} was interrupted; stopping.', flush=True)

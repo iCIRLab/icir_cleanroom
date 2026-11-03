@@ -90,12 +90,24 @@ class MujocoRobot:
     def site_position(self, name):
         return self.data.site_xpos[self.model.site(name).id].copy()
 
+    def base_point(self, offset):
+        """World position of a point given in the base body frame."""
+        rotation = self.data.xmat[self.base].reshape(3, 3)
+        return self.data.xpos[self.base] + rotation @ np.asarray(offset)
+
     def site_offset(self, site):
         """Site position and rotation matrix in the base body frame."""
-        rotation = self.data.xmat[self.base].reshape(3, 3)
-        position = rotation.T @ (
-            self.data.site_xpos[site] - self.data.xpos[self.base])
-        return position, rotation.T @ self.data.site_xmat[site].reshape(3, 3)
+        return self.offset(
+            self.data.site_xpos[site], self.data.site_xmat[site])
+
+    def body_offset(self, body):
+        """Body position and rotation matrix in the base body frame."""
+        return self.offset(self.data.xpos[body], self.data.xmat[body])
+
+    def offset(self, position, rotation):
+        base = self.data.xmat[self.base].reshape(3, 3)
+        return (base.T @ (position - self.data.xpos[self.base]),
+                base.T @ rotation.reshape(3, 3))
 
     def scan(self):
         """Ranges in the lidar site frame; inf outside the sensor range."""

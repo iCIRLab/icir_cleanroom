@@ -26,7 +26,9 @@ import psutil
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_methods_once import FIELDS, METHODS, code_version, free_port, read_result, run_one
+from run_methods_once import (
+    FIELDS, METHODS, add_simulator_arguments, check_simulator_arguments, code_version, free_port,
+    read_result, run_one, simulator_launch_arguments)
 
 ENVIRONMENT = 'cleanroom_amc'
 POLICY = 'independent_lrs_hrs_cleanroom_amc_no_history_v3'
@@ -160,10 +162,12 @@ def validate_artifacts(raw, path):
 
 
 class Campaign:
-    def __init__(self, root, package, start=50, end=99, methods=METHODS):
+    def __init__(self, root, package, start=50, end=99, methods=METHODS,
+                 simulator='gazebo', robot=None):
         self.root, self.package = root.resolve(), package.resolve()
         self.start, self.end = start, end
         self.methods = tuple(methods)
+        self.simulator, self.robot = simulator, robot
         self.state_path = self.root / 'progress.json'
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else None
 
@@ -183,6 +187,7 @@ class Campaign:
             controller.update(load_history=False, save_history=False, history_file='', repeat_after_hrs=False,
                               hrs_ucb_k=0.0, hrs_distance_weight=0.0)
             self.state = dict(policy=POLICY, environment=ENVIRONMENT, start_seed=self.start, end_seed=self.end,
+                              simulator=self.simulator, robot=self.robot,
                               created_utc=now(), status='preparing', active=None,
                               code_version=code_version(self.package),
                               base_profile=profile, base_controller=controller,
@@ -196,8 +201,10 @@ class Campaign:
         if (self.state.get('policy') != POLICY or self.state.get('environment') != ENVIRONMENT
                 or self.state['start_seed'] != self.start
                 or self.state['end_seed'] != self.end
-                or tuple(self.state.get('methods', METHODS)) != self.methods):
-            raise ValueError('Experiment policy/environment/range/methods does not match; '
+                or tuple(self.state.get('methods', METHODS)) != self.methods
+                or self.state.get('simulator', 'gazebo') != self.simulator
+                or self.state.get('robot') != self.robot):
+            raise ValueError('Experiment policy/environment/range/methods/simulator does not match; '
                              'use a new results directory for cleanroom_amc')
         for seed in range(self.start, self.end + 1):
             if seed in self.state['prepared_seeds']:
@@ -236,10 +243,12 @@ class Campaign:
                 command = ['ros2', 'launch', 'icir_cleanroom', 'gas_mapping.launch.py',
                            f'environment:={ENVIRONMENT}', f'method:={method}',
                            'save_history:=false', 'repeat_after_hrs:=false', 'headless:=true',
-                           f'run_config:={config_path}']
+                           f'run_config:={config_path}',
+                           *simulator_launch_arguments(self.simulator, self.robot)]
                 runs.append(dict(method=method, ros_domain_id=40 + i, command=command,
                                  config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest()))
             write_json(root / 'manifest.json', dict(seed=seed, policy=POLICY, environment=ENVIRONMENT,
+                       simulator=self.simulator, robot=self.robot,
                        source_mode='random_after_peak', load_history=False, save_history=False,
                        history_copied=False, gui=False,
                        code_version=self.state['code_version'], runs=runs))
@@ -538,7 +547,9 @@ def main(argv=None):
     parser.add_argument('--end-seed', type=int, default=99, help='Last seed, inclusive (default: 99)')
     parser.add_argument('--methods', default=','.join(METHODS),
                         help=f'Comma-separated subset of {",".join(METHODS)} (default: all)')
+    add_simulator_arguments(parser)
     args = parser.parse_args(argv)
+    check_simulator_arguments(parser, args)
     args.methods = tuple(m.strip().upper() for m in args.methods.split(',') if m.strip())
     unknown = [m for m in args.methods if m not in METHODS]
     if unknown or not args.methods:
@@ -551,14 +562,15 @@ def main(argv=None):
                         handlers=[logging.StreamHandler(), logging.FileHandler(args.results / 'runner.log')])
     with (args.results / '.runner.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if args.run:
+        if args.run and args.sim == 'gazebo':
             active = []
             for p in psutil.process_iter(['pid', 'name', 'status']):
                 if p.info['name'] in ('gzserver', 'gzclient') and p.info['status'] != psutil.STATUS_ZOMBIE:
                     active.append(p.pid)
             if active:
                 raise RuntimeError(f'Gazebo already running; no concurrent simulation: {active}')
-        campaign = Campaign(args.results, args.package, args.start_seed, args.end_seed, args.methods)
+        campaign = Campaign(args.results, args.package, args.start_seed, args.end_seed, args.methods,
+                            args.sim, args.robot)
         campaign.prepare()
         LOG.info('Prepared %s independent runs on %s, seeds %s..%s, history disabled',
                  len(campaign.state['tasks']), ENVIRONMENT, args.start_seed, args.end_seed)

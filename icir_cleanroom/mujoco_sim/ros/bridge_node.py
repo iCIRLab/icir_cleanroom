@@ -91,13 +91,14 @@ class MujocoBridgeNode(Node):
         self.joint_pub = self.create_publisher(
             JointState, '/joint_states', 10)
         self.gas_sensor_pub = None
-        if self.config.get('gas_sensor_site'):
+        if (self.config.get('gas_sensor_site')
+                or self.config.get('gas_sensor_offset')):
             self.gas_sensor_pub = self.create_publisher(
                 PoseStamped, '/gas_sensor/sensor_pose', 10)
         self.tf = TransformBroadcaster(self)
         if not self.config.get('description'):
             self.static_tf = StaticTransformBroadcaster(self)
-            self.publish_lidar_frame()
+            self.publish_static_frames()
         self.state_timer = Every(STATE_RATE)
         self.scan_timer = Every(self.config['lidar']['rate'])
         self.gas_sensor_timer = Every(GAS_SENSOR_RATE)
@@ -176,7 +177,11 @@ class MujocoBridgeNode(Node):
         self.scan_pub.publish(scan)
 
     def publish_gas_sensor(self, header_stamp):
-        position = self.robot.site_position(self.config['gas_sensor_site'])
+        if self.config.get('gas_sensor_site'):
+            position = self.robot.site_position(
+                self.config['gas_sensor_site'])
+        else:
+            position = self.robot.base_point(self.config['gas_sensor_offset'])
         pose = PoseStamped()
         pose.header.stamp = header_stamp
         pose.header.frame_id = 'map'
@@ -186,18 +191,27 @@ class MujocoBridgeNode(Node):
         pose.pose.orientation.w = 1.0
         self.gas_sensor_pub.publish(pose)
 
-    def publish_lidar_frame(self):
-        position, rotation = self.robot.site_offset(self.robot.lidar_site)
-        transform = TransformStamped()
-        transform.header.frame_id = self.config['base_body']
-        transform.child_frame_id = self.config['lidar']['frame']
-        (transform.transform.translation.x,
-         transform.transform.translation.y,
-         transform.transform.translation.z) = map(float, position)
-        (transform.transform.rotation.w, transform.transform.rotation.x,
-         transform.transform.rotation.y,
-         transform.transform.rotation.z) = quaternion_from_matrix(rotation)
-        self.static_tf.sendTransform(transform)
+    def publish_static_frames(self):
+        """Without a URDF, publish base_link (Nav2) and the lidar frame."""
+        frames = [(self.config['lidar']['frame'],
+                   self.robot.site_offset(self.robot.lidar_site))]
+        if 'base_link' != self.config['base_body']:
+            frames.append(('base_link', self.robot.body_offset(
+                self.robot.model.body('base_link').id)))
+        transforms = []
+        for child, (position, rotation) in frames:
+            transform = TransformStamped()
+            transform.header.frame_id = self.config['base_body']
+            transform.child_frame_id = child
+            (transform.transform.translation.x,
+             transform.transform.translation.y,
+             transform.transform.translation.z) = map(float, position)
+            (transform.transform.rotation.w, transform.transform.rotation.x,
+             transform.transform.rotation.y,
+             transform.transform.rotation.z) = quaternion_from_matrix(
+                rotation)
+            transforms.append(transform)
+        self.static_tf.sendTransform(transforms)
 
     def close(self):
         if self.viewer is not None:
